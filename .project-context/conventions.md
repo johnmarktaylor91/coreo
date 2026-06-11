@@ -35,6 +35,12 @@ Separated by blank lines. No wildcard imports.
 - `// MARK: - Section` to divide long files into logical sections
 - File-level `//` comment at the top of files where the purpose isn't obvious from the type name
 
+## Tooling
+- **swiftlint** enforces style rules — all code must pass `swiftlint` with zero warnings
+- **swiftformat** enforces formatting — all code must pass `swiftformat --lint .`
+- **xcbeautify** for readable xcodebuild output — pipe all xcodebuild commands through it
+- **fastlane** for build/test/deploy automation
+
 ## Git
 - Commit messages: imperative mood, <72 chars first line — "Add audio cross-correlation engine"
 - Branch naming: `codex/<task-id>` for Codex tasks, `feat/<name>` for manual work

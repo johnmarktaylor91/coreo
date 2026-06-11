@@ -1,45 +1,52 @@
 # Coreo Architecture
 
 ## Module Map
-- **App/** — Entry point, root navigation, app lifecycle
-- **Models/** — Core data types: `Project`, `VideoClip`, `Annotation`. SwiftData models. No business logic.
-- **Capture/** — AVCaptureSession management, camera UI, photo library import. Produces `VideoClip` file URLs.
-- **Sync/** — Audio-based alignment engine. Extracts PCM from two clips, runs cross-correlation, outputs a time offset. Pure computation, no UI.
-- **Playback/** — Dual AVPlayer coordination with shared timeline. Side-by-side and PiP layouts. Annotation overlay during playback. Variable speed (0.25x–2x).
-- **Annotations/** — CRUD UI for timestamped text notes. Reads/writes `Annotation` models.
-- **Export/** — Composites video + annotation overlay into shareable clip via AVAssetExportSession.
-- **Storage/** — SwiftData persistence layer, file management for video assets in app sandbox.
-- **Utilities/** — Time formatting, AVAsset convenience extensions.
+- **App/** — Entry point (`CoreoApp`), root navigation (`ContentView`). Two-screen flow: Import → Workspace.
+- **Import/** — Screen 1. Photo library picker (PHPicker), Files app picker (UIDocumentPicker), video thumbnail display, sync trigger. `ImportViewModel` manages import state and kicks off audio sync.
+- **Workspace/** — Screen 2. The main screen — simultaneously preview, editor, and export trigger. `WorkspaceViewModel` is the central brain: owns all AVPlayers, unified timeline clock, playback state, annotation mode. `VideoGridView` arranges panels. `TimelineView` is the scrub bar.
+- **Sync/** — FFT-based audio cross-correlation. `AudioExtractor` converts video → mono PCM float array (8kHz). `AudioSyncEngine` correlates each video against a reference, outputs per-video time offsets + confidence scores. Uses Accelerate.framework (vDSP). Pure computation, no UI.
+- **Crop/** — Smart auto-crop via Vision framework. `PersonDetector` samples frames and runs `VNDetectHumanRectanglesRequest`. `SmartCropEngine` computes bounding box union + 15% padding. Falls back to full frame if no humans detected.
+- **Annotations/** — Time-stamped annotation system. Each annotation has a `visibleTimeRange` and fades in/out. Three content types: PencilKit drawing, text label, directional arrow. `AnnotationOverlayView` renders visible annotations. `AnnotationToolbar` provides creation tools. `AnnotationTimeRangeControl` adjusts visibility window.
+- **Speed/** — Per-segment playback speed and frame holds. `SpeedSegment` with rate 0.0 = freeze frame. UI for selecting timeline ranges and assigning speeds.
+- **Export/** — Full AVMutableComposition pipeline. Composites all panels into split-screen, overlays annotation CALayers with timed opacity animations, applies speed/hold map, appends 1s branded end bumper. Outputs .mp4 via AVAssetExportSession.
+- **Models/** — Core data types: `CoreoProject` (top-level container), `VideoAsset` (one video file), `LayoutEngine` (grid calculation for 2-6 panels). All Codable, persisted as JSON.
+- **Utilities/** — `FFTHelper` (Accelerate wrappers for cross-correlation), `TimeFormatting` (seconds → "M:SS.ff").
 
 ## Data Flow
-1. **Capture/Import** → video files land in app sandbox → `VideoClip` records created
-2. **Project creation** → user groups 2 clips into a `Project`
-3. **Sync** → `SyncEngine` takes two `VideoClip` assets → extracts audio → cross-correlates → writes `syncOffset` back to clips
-4. **Playback** → `SyncedPlayerController` reads clips + offsets → drives two AVPlayers in lockstep → `TimelineView` shows unified scrub bar with `Annotation` markers
-5. **Annotate** → user taps timeline → creates `Annotation` at current timestamp → persisted via SwiftData
-6. **Export** → `ExportManager` composites selected angle + annotation text overlay → outputs .mov for sharing
+1. **Import** → user picks videos from Photos/Files → `VideoAsset.from(url:)` extracts metadata + thumbnail → displayed in horizontal scroll row
+2. **Sync** → user taps "Sync & Go" → `AudioSyncEngine.sync()` extracts PCM from all videos, cross-correlates each against reference → produces `AudioSyncOutput` with per-video offsets and confidence scores
+3. **Crop** → `SmartCropEngine.computeCropRects()` runs person detection on each video, computes activity regions → stored as `cropOverrides` on project
+4. **Project creation** → `CoreoProject` assembled with videos, offsets, crops → navigates to Workspace
+5. **Playback** → `WorkspaceViewModel` creates one `AVPlayer` per video, applies sync offsets, drives all from unified timeline clock → `VideoGridView` renders panels via `LayoutEngine` → `TimelineView` shows scrub bar
+6. **Annotate** → user enters annotation mode → video pauses → user draws/types/arrows → `TimedAnnotation` created with 3s default visibility window → fades in/out during playback
+7. **Export** → `ExportEngine` builds `AVMutableComposition` → positions panels via `CGAffineTransform` → `AnnotationCompositor` builds `CALayer` tree with timed opacity animations → `EndBumperGenerator` creates 1s bumper → `AVAssetExportSession` outputs .mp4 → share sheet
 
 ## Key Abstractions
-- **Project** — Top-level container. Has a name, creation date, exactly 2 `VideoClip`s, and 0+ `Annotation`s. The unit of work.
-- **VideoClip** — Represents one video file. Holds: file URL, duration, `syncOffset` (TimeInterval, seconds relative to project timeline origin). Invariant: offset is set by SyncEngine, not manually.
-- **Annotation** — Timestamped note. Holds: text, timestamp (in project timeline coordinates), optional reference to which angle. Invariant: timestamp is in unified project time, not per-clip time.
-- **SyncedPlayerController** — The brain of playback. Owns two AVPlayers, translates unified timeline position to per-clip seek positions using sync offsets. Must handle: play/pause, seek, rate changes, end-of-clip edge cases.
-- **SyncEngine** — Stateless computation. Input: two AVAssets. Output: TimeInterval offset. Should be cancellable (async/await with Task).
+- **CoreoProject** — Top-level container. Has 2-6 `VideoAsset`s, per-video sync offsets, layout/crop overrides, speed segments, annotations, audio source selection. The unit of persistence. Saved as JSON to Documents directory.
+- **VideoAsset** — One video file. Holds: local URL, duration, dimensions, audio metadata, thumbnail data. Factory method `from(url:)` extracts everything from an AVAsset.
+- **WorkspaceViewModel** — The brain. Owns all AVPlayers, unified timeline clock (currentTimeSeconds), playback state (playing, rate), annotation mode state. All players seek/play/pause in lockstep. Single source of truth for what's happening on screen.
+- **TimedAnnotation** — Time-aware note. Has `visibleTimeRange` controlling when it appears. `opacity(at:)` method returns 0-1 with 0.2s fade. Three content types: drawing (PKDrawing), text (positioned label), arrow (directional). Per-project, not per-panel — overlays entire grid.
+- **AudioSyncEngine** — Stateless computation. Input: array of video URLs + audio bitrates. Output: `AudioSyncOutput` with offsets + confidence. Uses FFT cross-correlation via Accelerate. Reference video = highest bitrate.
+- **LayoutEngine** — Pure function. Input: video count, aspect ratios, container size. Output: array of CGRect panel frames. Evaluates all layout variants, picks the one maximizing visible video area.
 
 ## Dependency Graph
 ```
-App → Capture, Playback, Annotations, Storage
-Capture → Models, Storage (writes clips)
-Sync → Models (reads clips, writes offsets), Utilities
-Playback → Models, Annotations, Utilities
-Annotations → Models, Storage
-Export → Models, Playback (borrows timeline logic), Utilities
-Storage → Models
+App → Import, Workspace
+Import → Models, Sync, Crop
+Workspace → Models, Annotations, Speed, Export, Utilities
+Sync → Utilities (FFTHelper)
+Crop → (standalone, uses Vision)
+Annotations → Models (annotation types)
+Speed → Models (SpeedSegment)
+Export → Models, Annotations, Utilities
+Models → (foundation, no deps)
+Utilities → (foundation, no deps)
 ```
-No circular dependencies. Sync and Playback are independent — Sync runs once, Playback reads the result.
+No circular dependencies. Import triggers Sync+Crop, then hands off to Workspace. Export reads everything but doesn't feed back.
 
 ## Known Complexity
-- **Audio cross-correlation** (Sync/) — DSP math, must handle: different sample rates, stereo→mono conversion, noise, silence. The hardest algorithmic piece.
-- **Dual AVPlayer synchronization** (Playback/) — AVPlayer seek is async and imprecise. Keeping two players in sub-frame sync during scrubbing and rate changes is fiddly. May need CMTimebase linking.
-- **Memory pressure** — Two simultaneous video playback streams + audio extraction buffers. Must stream, not bulk-load.
-- **Export compositing** — Overlaying annotation text at correct timestamps onto video requires AVVideoComposition with custom compositor or CALayer tree.
+- **FFT cross-correlation** (Sync/) — DSP math via Accelerate. Must handle: zero-padding to power-of-2, stereo→mono downsampling to 8kHz, peak detection with confidence thresholding. Performance target: <2s for typical 3-5 min clips.
+- **Multi-AVPlayer synchronization** (Workspace/) — AVPlayer seek is async and imprecise. Keeping 2-6 players in sync during scrubbing and rate changes requires toleranceBefore:.zero seeks and careful ordering.
+- **Timed annotation export** (Export/) — CALayer tree with CAKeyframeAnimation for per-annotation opacity, using AVVideoCompositionCoreAnimationTool. AVCoreAnimationBeginTimeAtZero timing. PencilKit drawings rasterized to UIImage → CALayer.contents.
+- **Speed/hold time manipulation** (Export/) — Requires AVMutableComposition.scaleTimeRange() for each speed segment across all tracks. Holds insert frozen frames. Complex time math.
+- **Memory pressure** — Up to 6 simultaneous AVPlayer video streams. Smart crop person detection loads frame samples. Export builds full composition in memory. Must be careful with large/long videos.

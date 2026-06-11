@@ -1,41 +1,48 @@
 # Coreo — Claude Code Architect Briefing
 
 ## Project Overview
-Coreo is an iOS app for salsa, bachata, and kizomba dancers to record, sync,
-and annotate multi-angle dance videos. Users film the same combo from two phone
-angles, Coreo syncs the footage via audio analysis, and they review both angles
-simultaneously with timestamped annotations. $4.99 one-time purchase, no cloud,
-no accounts.
+Coreo is a native iOS app for learning choreography from multi-angle video.
+Users import 2-6 dance videos filmed from different angles, Coreo auto-syncs
+them via FFT audio cross-correlation, displays them in an intelligent split-screen
+layout with smart auto-crop, and supports time-stamped annotations (drawings,
+text, arrows) that fade in/out at designated moments. Export produces a single
+composited .mp4. $4.99 one-time purchase, no cloud, no accounts. See DESIGN.md
+for full product spec.
 
 ## Architecture
 See `.project-context/architecture.md` for the full map.
 
+Two-screen design: Import (drop zone) → Workspace (preview + edit + export).
+
 Key entry points:
 - App entry: `Coreo/App/CoreoApp.swift`
-- Video capture: `Coreo/Capture/` (AVFoundation camera pipeline)
-- Sync engine: `Coreo/Sync/` (audio-based multi-angle alignment)
-- Playback: `Coreo/Playback/` (side-by-side / PiP with shared timeline)
-- Annotations: `Coreo/Annotations/` (timestamped notes on timeline)
-- Models: `Coreo/Models/` (Project, VideoClip, Annotation data types)
+- Import screen: `Coreo/Import/` (PHPicker, document picker, thumbnail display)
+- Sync engine: `Coreo/Sync/` (FFT audio cross-correlation via Accelerate)
+- Smart crop: `Coreo/Crop/` (Vision framework person detection)
+- Workspace: `Coreo/Workspace/` (split-screen playback, unified timeline, WorkspaceViewModel)
+- Annotations: `Coreo/Annotations/` (PencilKit drawing, text, arrows, time-ranged visibility)
+- Speed/hold: `Coreo/Speed/` (per-segment speed control, frame freeze)
+- Export: `Coreo/Export/` (AVMutableComposition pipeline, annotation compositor, end bumper)
+- Models: `Coreo/Models/` (CoreoProject, VideoAsset, LayoutEngine)
 - Tests: `CoreoTests/` — `xcodebuild test`
-- Build: `xcodebuild -scheme Coreo -sdk iphonesimulator build`
+- Build: `xcodebuild -scheme Coreo build`
 
 ## How to Read This Codebase
-- Start with `Models/` to understand core data types (Project, VideoClip, Annotation)
-- Complexity lives in `Sync/` (audio cross-correlation algorithm) and `Playback/` (synchronized AVPlayer coordination)
-- `Capture/` and `Annotations/` are relatively straightforward SwiftUI + AVFoundation
-- Everything is in flux — greenfield project, nothing is stable yet
+- Start with `Models/CoreoProject.swift` and `Annotations/AnnotationModel.swift` for core data types
+- Complexity lives in `Sync/AudioSyncEngine.swift` (FFT cross-correlation), `Workspace/WorkspaceViewModel.swift` (unified timeline + multi-player coordination), and `Export/ExportEngine.swift` (AVMutableComposition pipeline)
+- `Import/` and `Speed/` are relatively straightforward SwiftUI
+- Everything is in active development — initial build, nothing is stable yet
 
 ## Testing Tiers
 ```
 # Tier 1 — Fast (run on every change)
-xcodebuild test -scheme Coreo -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 16' -only-testing:CoreoTests/UnitTests 2>&1 | xcpretty
+xcodebuild test -scheme Coreo -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -only-testing:CoreoTests/UnitTests | xcbeautify
 
 # Tier 2 — Medium (run when module boundaries change)
-xcodebuild test -scheme Coreo -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 16' 2>&1 | xcpretty
+xcodebuild test -scheme Coreo -destination 'platform=iOS Simulator,name=iPhone 17 Pro' | xcbeautify
 
 # Tier 3 — Full (run during downtime / before release)
-swiftlint lint --strict && xcodebuild test -scheme Coreo -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 16' 2>&1 | xcpretty
+swiftlint && swiftformat --lint . && xcodebuild test -scheme Coreo -destination 'platform=iOS Simulator,name=iPhone 17 Pro' | xcbeautify
 ```
 
 ## Dispatch Configuration
@@ -49,9 +56,9 @@ Descriptive kebab-case: `add-sync-engine`, `fix-playback-drift`, `add-annotation
 
 ### Quality Gates (every Codex task must pass)
 ```
-swiftlint lint --strict
-xcodebuild build -scheme Coreo -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 16' 2>&1 | xcpretty
-xcodebuild test -scheme Coreo -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 16' -only-testing:CoreoTests/UnitTests 2>&1 | xcpretty
+swiftlint
+swiftformat --lint .
+xcodebuild test -scheme Coreo -destination 'platform=iOS Simulator,name=iPhone 17 Pro' | xcbeautify
 ```
 
 ## PR Workflow

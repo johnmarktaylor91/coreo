@@ -1,4 +1,4 @@
-# [PROJECT NAME] Architectural Decisions
+# Coreo Architectural Decisions
 
 <!-- Format: ## [DATE] Decision Title
 Context: why this came up

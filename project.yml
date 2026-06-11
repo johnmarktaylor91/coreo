@@ -1,0 +1,48 @@
+name: Coreo
+options:
+  minimumXcodeGenVersion: "2.35"
+  deploymentTarget:
+    iOS: "16.0"
+  xcodeVersion: "15.0"
+  bundleIdPrefix: com.coreo
+  groupSortPosition: top
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    TARGETED_DEVICE_FAMILY: "1,2"
+    GENERATE_INFOPLIST_FILE: YES
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+
+targets:
+  Coreo:
+    type: application
+    platform: iOS
+    sources:
+      - path: Coreo
+        excludes:
+          - "**/*.xcassets/**/Contents.json"
+    resources:
+      - path: Coreo/Resources/Assets.xcassets
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.coreo.app
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        INFOPLIST_KEY_CFBundleDisplayName: Coreo
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+        INFOPLIST_KEY_UISupportedInterfaceOrientations~ipad: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        INFOPLIST_KEY_NSPhotoLibraryUsageDescription: "Coreo needs access to your photo library to import dance videos."
+        INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription: "Coreo needs permission to save exported videos to your photo library."
+
+  CoreoTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: CoreoTests
+    dependencies:
+      - target: Coreo
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.coreo.app.tests

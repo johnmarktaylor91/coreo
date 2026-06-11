@@ -2,9 +2,10 @@
   "permissions": {
     "allow": [
       "Bash(./scripts/*)",
-      "Bash(ruff *)",
-      "Bash(mypy *)",
-      "Bash(pytest *)",
+      "Bash(swiftlint *)",
+      "Bash(swiftformat *)",
+      "Bash(xcodebuild *)",
+      "Bash(fastlane *)",
       "Bash(gh *)",
       "Read",
       "Write(.project-context/*)"
