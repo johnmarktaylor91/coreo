@@ -253,7 +253,7 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(loaded?.id, original.id)
         XCTAssertEqual(loaded?.name, "Save Test")
         XCTAssertEqual(loaded?.videos.count, 1)
-        XCTAssertEqual(loaded?.videos[0].durationSeconds, 10.0, accuracy: 0.001)
+        XCTAssertEqual(try XCTUnwrap(loaded?.videos[0].durationSeconds), 10.0, accuracy: 0.001)
 
         // Clean up
         let documentsDirectory = FileManager.default.urls(
