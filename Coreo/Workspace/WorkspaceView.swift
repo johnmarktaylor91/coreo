@@ -61,6 +61,10 @@ struct WorkspaceView: View {
                         holdIndicator(hold)
                     }
 
+                    if let count = viewModel.countIn.currentCount {
+                        countInOverlay(count)
+                    }
+
                     // Annotation overlay — always displays annotations; editing is mode-gated.
                     AnnotationOverlayView(
                         viewModel: viewModel,
@@ -102,6 +106,7 @@ struct WorkspaceView: View {
             }
         }
         .onDisappear {
+            viewModel.cancelCountIn()
             viewModel.tearDown()
         }
         .sheet(isPresented: $bindableExport.showShareSheet, onDismiss: {
@@ -129,9 +134,8 @@ struct WorkspaceView: View {
             // Back button
             Button {
                 Haptic.light()
-                if viewModel.playback.isPlaying {
-                    viewModel.togglePlayback()
-                }
+                viewModel.cancelCountIn()
+                viewModel.playback.pauseIfNeeded()
                 dismiss()
             } label: {
                 Image(systemName: "chevron.left")
@@ -412,6 +416,23 @@ struct WorkspaceView: View {
             Spacer()
         }
         .padding(12)
+    }
+
+    /// Renders the count-in number over the video grid.
+    ///
+    /// - Parameter count: Visible count-in number.
+    /// - Returns: Count-in overlay view.
+    private func countInOverlay(_ count: Int) -> some View {
+        Text("\(count)")
+            .font(.system(size: 96, weight: .bold, design: .rounded))
+            .foregroundColor(.white)
+            .shadow(color: .black.opacity(0.45), radius: 12, x: 0, y: 4)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color.black.opacity(0.12))
+            .transition(reduceMotion ? .opacity : .scale(scale: 0.82).combined(with: .opacity))
+            .id(count)
+            .allowsHitTesting(false)
+            .accessibilityLabel("Count \(count)")
     }
 
     /// Menu for switching the active audio source among imported videos.

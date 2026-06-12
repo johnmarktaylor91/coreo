@@ -22,12 +22,14 @@ struct PlaybackControlsView: View {
             timeDisplay
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            // MARK: Center — Frame Step + Play/Pause
+            // MARK: Center — Loop + Frame Step + Play/Pause
 
             HStack(spacing: Spacing.sm) {
+                loopButton
                 frameStepButton(direction: -1)
                 playPauseButton
                 frameStepButton(direction: 1)
+                countInToggle
             }
 
             // MARK: Right — Speed Picker
@@ -61,14 +63,87 @@ struct PlaybackControlsView: View {
             Haptic.light()
             viewModel.togglePlayback()
         } label: {
-            Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill")
+            Image(systemName: playback.isPlaying || viewModel.countIn.isActive ? "pause.fill" : "play.fill")
                 .font(.title2)
                 .foregroundColor(.white)
                 .frame(width: 44, height: 44)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.coreoToolbar)
-        .accessibilityLabel(playback.isPlaying ? "Pause" : "Play")
+        .accessibilityLabel(playback.isPlaying || viewModel.countIn.isActive ? "Pause" : "Play")
+    }
+
+    /// A-B loop activation and clear button.
+    private var loopButton: some View {
+        Button {
+            let result = viewModel.activateLoopControl()
+            switch result {
+            case .armed, .activated, .cleared:
+                Haptic.tick()
+            case .rejectedTooShort:
+                Haptic.error()
+            }
+        } label: {
+            Image(systemName: loopIconName)
+                .font(.body.weight(.semibold))
+                .foregroundColor(loopTint)
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.coreoToolbar)
+        .accessibilityLabel(loopAccessibilityLabel)
+    }
+
+    /// Count-in preference toggle.
+    private var countInToggle: some View {
+        @Bindable var bindableCountIn = viewModel.countIn
+
+        return Toggle(isOn: $bindableCountIn.isEnabled) {
+            Image(systemName: "timer")
+                .font(.body.weight(.semibold))
+                .foregroundColor(viewModel.countIn.isEnabled ? CoreoColor.accent : .white.opacity(0.72))
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .toggleStyle(.button)
+        .buttonStyle(.coreoToolbar)
+        .accessibilityLabel(viewModel.countIn.isEnabled ? "Count-in on" : "Count-in off")
+    }
+
+    /// System icon for the current loop state.
+    private var loopIconName: String {
+        switch playback.loopState {
+        case .cleared:
+            "repeat"
+        case .armed:
+            "a.circle.fill"
+        case .active:
+            "repeat.circle.fill"
+        }
+    }
+
+    /// Foreground tint for the current loop state.
+    private var loopTint: Color {
+        switch playback.loopState {
+        case .cleared:
+            .white.opacity(0.72)
+        case .armed:
+            .yellow
+        case .active:
+            CoreoColor.accent
+        }
+    }
+
+    /// VoiceOver label for the current loop state.
+    private var loopAccessibilityLabel: String {
+        switch playback.loopState {
+        case .cleared:
+            "Set loop start"
+        case .armed:
+            "Set loop end"
+        case .active:
+            "Clear A-B loop"
+        }
     }
 
     /// One-frame step button.

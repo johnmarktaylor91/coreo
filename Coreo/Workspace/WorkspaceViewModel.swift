@@ -31,6 +31,9 @@ final class WorkspaceViewModel {
     /// Export progress, cancellation, and share state.
     let export: ExportCoordinator
 
+    /// Count-in preference and transient state.
+    let countIn: CountInController
+
     /// True when the annotation drawing overlay is active.
     var isAnnotationMode: Bool = false
 
@@ -45,6 +48,9 @@ final class WorkspaceViewModel {
 
     /// Video IDs currently allowed to play audio in preview.
     var unmutedVideoIDs: Set<UUID>
+
+    /// Cached interactive scrub snap landmarks.
+    private(set) var scrubSnapTargets: ScrubSnapTargets
 
     /// The project store used for media URL resolution and autosave.
     private let projectStore: ProjectStore
@@ -100,7 +106,14 @@ final class WorkspaceViewModel {
         self.projectStore = projectStore
         annotations = AnnotationStore(annotations: project.annotations)
         export = ExportCoordinator()
+        countIn = CountInController()
         unmutedVideoIDs = Set(project.audioSourceVideoID.map { [$0] } ?? [])
+        scrubSnapTargets = ScrubSnapTargets.build(
+            annotations: project.annotations,
+            speedSegments: project.speedSegments,
+            timelineStart: project.timelineStartSeconds,
+            timelineEnd: project.timelineEndSeconds
+        )
         playback = PlaybackController(
             project: project,
             projectStore: projectStore,
@@ -122,7 +135,33 @@ final class WorkspaceViewModel {
 
     /// Toggles between playing and paused.
     func togglePlayback() {
-        playback.togglePlayback()
+        if countIn.isActive {
+            countIn.cancel()
+            return
+        }
+        if playback.isPlaying {
+            playback.togglePlaybackImmediately()
+        } else if countIn.isEnabled {
+            countIn.start(
+                onCount: { _ in Haptic.tick() },
+                onComplete: { [weak self] in
+                    self?.playback.resumePlayback()
+                }
+            )
+        } else {
+            playback.togglePlaybackImmediately()
+        }
+    }
+
+    /// Toggles playback immediately for programmatic resume paths.
+    func togglePlaybackImmediately() {
+        countIn.cancel()
+        playback.togglePlaybackImmediately()
+    }
+
+    /// Cancels any active count-in without starting playback.
+    func cancelCountIn() {
+        countIn.cancel()
     }
 
     /// Seeks all players to the given timeline position.
@@ -138,7 +177,15 @@ final class WorkspaceViewModel {
     ///   - timelineSeconds: Desired playhead position in timeline coordinates.
     ///   - precise: True for tolerance-zero settles; false for coalesced scrub seeks.
     func seek(to timelineSeconds: Double, precise: Bool) {
+        countIn.cancel()
         playback.seek(to: timelineSeconds, precise: precise)
+    }
+
+    /// Handles the A-B loop control and returns its transition result.
+    ///
+    /// - Returns: Loop transition result.
+    func activateLoopControl() -> ABLoopActivationResult {
+        playback.activateLoopControl()
     }
 
     /// Switches which video's audio is heard during playback.
@@ -186,6 +233,7 @@ final class WorkspaceViewModel {
     ///
     /// - Parameter direction: -1 for backward, +1 for forward.
     func stepFrame(direction: Int) {
+        countIn.cancel()
         playback.stepFrames(direction < 0 ? -1 : 1)
     }
 
@@ -415,6 +463,7 @@ final class WorkspaceViewModel {
 
     /// Pauses all players, saves, and removes observers.
     func tearDown() {
+        countIn.cancel()
         playback.tearDown()
         export.tearDown()
         saveImmediately()
@@ -441,11 +490,22 @@ private extension WorkspaceViewModel {
     func syncChildrenFromProject() {
         playback.updateProject(project)
         annotations.updateAnnotations(project.annotations)
+        rebuildScrubSnapTargets()
     }
 
     /// Writes annotation store changes back into the project.
     func syncProjectAnnotationsFromStore() {
         project.annotations = annotations.annotations
+    }
+
+    /// Rebuilds cached scrub snap landmarks after landmark sources change.
+    func rebuildScrubSnapTargets() {
+        scrubSnapTargets = ScrubSnapTargets.build(
+            annotations: project.annotations,
+            speedSegments: project.speedSegments,
+            timelineStart: project.timelineStartSeconds,
+            timelineEnd: project.timelineEndSeconds
+        )
     }
 }
 

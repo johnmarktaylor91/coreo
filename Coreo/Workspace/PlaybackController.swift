@@ -23,6 +23,9 @@ final class PlaybackController {
     /// True when the speed picker popover is shown.
     var isSpeedPickerVisible: Bool = false
 
+    /// Session-only A-B loop state.
+    private(set) var loopState: ABLoopState = .cleared
+
     /// Current live hold event, if playback is intentionally frozen.
     private(set) var activeHoldEvent: HoldPlaybackCoordinator.HoldEvent?
 
@@ -58,6 +61,9 @@ final class PlaybackController {
 
     /// Pure hold crossing detector.
     private let holdCoordinator = HoldPlaybackCoordinator()
+
+    /// Pure A-B loop policy.
+    private var loopCoordinator = LoopPlaybackCoordinator()
 
     /// Pending hold resume task.
     private var holdTask: Task<Void, Never>?
@@ -104,6 +110,11 @@ final class PlaybackController {
     /// - Parameter project: Updated project state.
     func updateProject(_ project: CoreoProject) {
         self.project = project
+        let didClearLoop = loopCoordinator.clearIfOutOfBounds(durationEndSeconds: project.timelineEndSeconds)
+        loopState = loopCoordinator.state
+        if didClearLoop {
+            Haptic.light()
+        }
         rebuildPlaybackCaches()
     }
 
@@ -127,6 +138,11 @@ final class PlaybackController {
         if isPlaying {
             pausePlayback()
         }
+    }
+
+    /// Toggles playback immediately, without any count-in policy.
+    func togglePlaybackImmediately() {
+        togglePlayback()
     }
 
     /// Starts playback if players are available.
@@ -222,6 +238,23 @@ final class PlaybackController {
         seek(to: steppedTime, precise: true)
     }
 
+    /// Handles one A-B loop control activation at the current playhead.
+    ///
+    /// - Returns: Transition result for haptics and accessibility state.
+    func activateLoopControl() -> ABLoopActivationResult {
+        let result = loopCoordinator.activate(at: currentTimeSeconds)
+        loopState = loopCoordinator.state
+        return result
+    }
+
+    /// Active loop region if both points have been set.
+    var activeLoopRegion: LoopRegion? {
+        if case let .active(region) = loopState {
+            return region
+        }
+        return nil
+    }
+
     /// Computes frame-step target time clamped to the timeline.
     ///
     /// - Parameters:
@@ -287,6 +320,8 @@ final class PlaybackController {
         stopClockLoop()
         cancelHold()
         seekTask?.cancel()
+        loopCoordinator.clear()
+        loopState = loopCoordinator.state
         for player in players {
             player.pause()
         }
@@ -415,9 +450,23 @@ private extension PlaybackController {
         let effectiveRate = playbackRate * segmentRate
         var nextTimeline = previousTimeline + delta * Double(max(effectiveRate, 0))
 
+        if let loopTarget = loopCoordinator.loopSeekTarget(
+            previousSeconds: previousTimeline,
+            currentSeconds: nextTimeline,
+            isPlaying: isPlaying
+        ) {
+            currentTimeSeconds = loopTarget
+            resetClockAnchor(at: loopTarget)
+            previousTickHostSeconds = hostNow
+            previousTickTimelineSeconds = loopTarget
+            coalescedSeek(to: loopTarget, precise: true, resumeAfterSeek: true)
+            return
+        }
+
         if nextTimeline >= project.timelineEndSeconds {
             nextTimeline = project.timelineStartSeconds
             coalescedSeek(to: nextTimeline, precise: true, resumeAfterSeek: true)
+            return
         }
 
         if let holdEvent = holdCoordinator.crossedHold(

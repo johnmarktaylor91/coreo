@@ -20,10 +20,12 @@
 		295731025BB8BE4D3513B326 /* AnnotationModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58CB611F8B2FB596771CBDD3 /* AnnotationModelTests.swift */; };
 		33F9F333682AD1B93A1EEFBA /* WorkspaceViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B13FCA690B97E07BFB0CB2FF /* WorkspaceViewModel.swift */; };
 		394681F90A3007CEC4CE75EB /* ExportEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2412335955689EC824A5176 /* ExportEngine.swift */; };
+		3A370486B0D33572D6DFC64B /* CountInController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E11B12FB905CDE2A3A2C00C3 /* CountInController.swift */; };
 		3E9FD381B8ADA32A73C2FD56 /* TimeFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78F1A7D9A2CAB2FD38866CB5 /* TimeFormatting.swift */; };
 		407847321F6B79C95952D3B5 /* VideoThumbnailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA96B593548A25D4AA38C869 /* VideoThumbnailView.swift */; };
 		408168F1F5086F5662BABB79 /* ProjectStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FAFFD4521E9245038C8190E /* ProjectStore.swift */; };
 		419D95B2E7F400E1532695C0 /* ArrowAnnotationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A27504774982A729418B34BE /* ArrowAnnotationView.swift */; };
+		41FD685DE5B356C10E4859B8 /* LoopPlaybackCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8776FC1CC6433668AE27EDE6 /* LoopPlaybackCoordinator.swift */; };
 		540A2FB954CC4338A7A3F735 /* FFTHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9DD7A94D95FD0BE852551F1 /* FFTHelper.swift */; };
 		56298196B45A1871D73E4473 /* AnnotationOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A7CC39B4F38C14EC537FAA0 /* AnnotationOverlayView.swift */; };
 		5650A40D272153DABC7FEE49 /* ImportViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3590416D6841AF648EAF5F1 /* ImportViewModel.swift */; };
@@ -49,11 +51,13 @@
 		9E4EA868BB2E406C37B5F321 /* TimelineCoordinateMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C1C6D6A6341BD85A4D9923B /* TimelineCoordinateMapper.swift */; };
 		AB020E78BA55C8521E0A7E9A /* PlaybackControlsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E561E3BA7FCBE22CA60373D /* PlaybackControlsView.swift */; };
 		BE179B6B66A6B234E0D08E4D /* AnnotationTimeRangeControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10B7A50CD67FB317E0A368EA /* AnnotationTimeRangeControl.swift */; };
+		BE559F052CB0EA0D6C68AE8F /* ScrubSnapTargets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 527ED34B25352A0B8DD23BDF /* ScrubSnapTargets.swift */; };
 		BFF5EFB5A279DEF1D9A6CC42 /* VideoAsset.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5AD1ADC5FF63295B2FCD6D6E /* VideoAsset.swift */; };
 		C2878BA34040DC5DD5C066FA /* HoldMarkerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF3FDBA0357B138104D2656D /* HoldMarkerView.swift */; };
 		C9A8E136D4252B14D2D9BF48 /* PanelCompositor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10B0ABA82CFA9C92B7C83779 /* PanelCompositor.swift */; };
 		D185F932C17DCB61BE7A80E0 /* LayoutEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 836D9C50D78CB209852F60F1 /* LayoutEngineTests.swift */; };
 		D256488305511E5DBCB486AD /* LayoutEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AF6BB6BEEE6C897FF2FCE9F /* LayoutEngine.swift */; };
+		D47D6BE4F07336BA3C156ED8 /* PlaybackFeatureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7247C8F660A53AA17691F979 /* PlaybackFeatureTests.swift */; };
 		DD03ED92FF9569E3A1BA3C0E /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 122532ABA7CBEFA3B0F736BA /* Haptics.swift */; };
 		DED036A789007E2738FCA0FC /* TimeFormattingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7427923A6B67371B8FC970A /* TimeFormattingTests.swift */; };
 		E16F0D386AE26B5E943349D2 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B346BE9DE416E5A470DED9AA /* ContentView.swift */; };
@@ -96,6 +100,7 @@
 		47513E4279EAAB51B7A2EF2E /* PlaybackCoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackCoreTests.swift; sourceTree = "<group>"; };
 		49A4B8CEB51F38633802AE71 /* LayoutCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayoutCache.swift; sourceTree = "<group>"; };
 		524202D1ED4345FE4213C721 /* Coreo.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Coreo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		527ED34B25352A0B8DD23BDF /* ScrubSnapTargets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrubSnapTargets.swift; sourceTree = "<group>"; };
 		58CB611F8B2FB596771CBDD3 /* AnnotationModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationModelTests.swift; sourceTree = "<group>"; };
 		5AD1ADC5FF63295B2FCD6D6E /* VideoAsset.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoAsset.swift; sourceTree = "<group>"; };
 		5C2A18427C7F0F179AC064EC /* VideoPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoPanelView.swift; sourceTree = "<group>"; };
@@ -104,12 +109,14 @@
 		6380205E5DE7FB1904B715B3 /* ExportPlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportPlan.swift; sourceTree = "<group>"; };
 		67B4833D4AEB1C54181B78FC /* ImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportView.swift; sourceTree = "<group>"; };
 		6D3BF7B072CCC0B9693CFCF6 /* HoldPlaybackCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HoldPlaybackCoordinator.swift; sourceTree = "<group>"; };
+		7247C8F660A53AA17691F979 /* PlaybackFeatureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackFeatureTests.swift; sourceTree = "<group>"; };
 		75687BB4CF8220F5B8FC3551 /* ExportCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportCoordinator.swift; sourceTree = "<group>"; };
 		77156C7733C0AB696540D574 /* CoreoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreoApp.swift; sourceTree = "<group>"; };
 		78F1A7D9A2CAB2FD38866CB5 /* TimeFormatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeFormatting.swift; sourceTree = "<group>"; };
 		836D9C50D78CB209852F60F1 /* LayoutEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayoutEngineTests.swift; sourceTree = "<group>"; };
 		848F2882E6ABE131985BA616 /* SpeedControlView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedControlView.swift; sourceTree = "<group>"; };
 		8584ED4DB950FB1D529DD1B2 /* DocumentPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentPickerView.swift; sourceTree = "<group>"; };
+		8776FC1CC6433668AE27EDE6 /* LoopPlaybackCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoopPlaybackCoordinator.swift; sourceTree = "<group>"; };
 		8A301A071F44CBD5AEC1FD92 /* ModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelTests.swift; sourceTree = "<group>"; };
 		8AD2AD840D5DB2FD87D0B0F2 /* AnnotationRasterizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationRasterizer.swift; sourceTree = "<group>"; };
 		8CABA3689CE1CD52ADA89951 /* ExportProgressView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportProgressView.swift; sourceTree = "<group>"; };
@@ -139,6 +146,7 @@
 		DA8718750B9BDC0A9915EA7C /* TimelineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineView.swift; sourceTree = "<group>"; };
 		DB276728019E48AD1B619235 /* CropGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CropGeometry.swift; sourceTree = "<group>"; };
 		DF2297AFDA5A1FE3BE0FD3C8 /* SpeedSegmentModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedSegmentModel.swift; sourceTree = "<group>"; };
+		E11B12FB905CDE2A3A2C00C3 /* CountInController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CountInController.swift; sourceTree = "<group>"; };
 		E2412335955689EC824A5176 /* ExportEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportEngine.swift; sourceTree = "<group>"; };
 		F3590416D6841AF648EAF5F1 /* ImportViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportViewModel.swift; sourceTree = "<group>"; };
 		F53C8516EFED7C37FB2D8336 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
@@ -277,12 +285,15 @@
 			isa = PBXGroup;
 			children = (
 				A25F48455C6D084E8551311E /* AnnotationStore.swift */,
+				E11B12FB905CDE2A3A2C00C3 /* CountInController.swift */,
 				75687BB4CF8220F5B8FC3551 /* ExportCoordinator.swift */,
 				6D3BF7B072CCC0B9693CFCF6 /* HoldPlaybackCoordinator.swift */,
 				49A4B8CEB51F38633802AE71 /* LayoutCache.swift */,
+				8776FC1CC6433668AE27EDE6 /* LoopPlaybackCoordinator.swift */,
 				9ADB25DE9C60FFB45901D583 /* PlaybackController.swift */,
 				2E561E3BA7FCBE22CA60373D /* PlaybackControlsView.swift */,
 				97FB09D975CAE1BBC153A72C /* PlayerSyncPlan.swift */,
+				527ED34B25352A0B8DD23BDF /* ScrubSnapTargets.swift */,
 				1C1C6D6A6341BD85A4D9923B /* TimelineCoordinateMapper.swift */,
 				DA8718750B9BDC0A9915EA7C /* TimelineView.swift */,
 				CAC4621903D1097792D1D1FA /* VideoGridView.swift */,
@@ -324,6 +335,7 @@
 				836D9C50D78CB209852F60F1 /* LayoutEngineTests.swift */,
 				8A301A071F44CBD5AEC1FD92 /* ModelTests.swift */,
 				47513E4279EAAB51B7A2EF2E /* PlaybackCoreTests.swift */,
+				7247C8F660A53AA17691F979 /* PlaybackFeatureTests.swift */,
 				D7427923A6B67371B8FC970A /* TimeFormattingTests.swift */,
 				A89F0A47A1720B4CBB0E639D /* TimeMapperTests.swift */,
 			);
@@ -436,6 +448,7 @@
 				D185F932C17DCB61BE7A80E0 /* LayoutEngineTests.swift in Sources */,
 				F228C47A79A6A07C5778E9E0 /* ModelTests.swift in Sources */,
 				F085E7E53E38C3E89F070C03 /* PlaybackCoreTests.swift in Sources */,
+				D47D6BE4F07336BA3C156ED8 /* PlaybackFeatureTests.swift in Sources */,
 				DED036A789007E2738FCA0FC /* TimeFormattingTests.swift in Sources */,
 				8D3278A333338F724ED712B3 /* TimeMapperTests.swift in Sources */,
 			);
@@ -459,6 +472,7 @@
 				79D0769EBC3E5510C130EC19 /* CoreoApp.swift in Sources */,
 				79F68515F52DE6E991524427 /* CoreoButtonStyle.swift in Sources */,
 				66CDA9BD93FFD419CD5DB230 /* CoreoProject.swift in Sources */,
+				3A370486B0D33572D6DFC64B /* CountInController.swift in Sources */,
 				8E7E218E5D5B1D4BA648B372 /* CropGeometry.swift in Sources */,
 				0DBBB0C8973EE59168E7DBAE /* DesignSystem.swift in Sources */,
 				E1BAC1695127FD33A1EFAFEE /* DocumentPickerView.swift in Sources */,
@@ -476,12 +490,14 @@
 				5650A40D272153DABC7FEE49 /* ImportViewModel.swift in Sources */,
 				17FBF3A7FF4AF0CA8F431CAF /* LayoutCache.swift in Sources */,
 				D256488305511E5DBCB486AD /* LayoutEngine.swift in Sources */,
+				41FD685DE5B356C10E4859B8 /* LoopPlaybackCoordinator.swift in Sources */,
 				C9A8E136D4252B14D2D9BF48 /* PanelCompositor.swift in Sources */,
 				025333983E82CCB388C07593 /* PersonDetector.swift in Sources */,
 				770AFA9C1C806621B179F3D2 /* PlaybackController.swift in Sources */,
 				AB020E78BA55C8521E0A7E9A /* PlaybackControlsView.swift in Sources */,
 				E42542171136EEB19CEBA1EA /* PlayerSyncPlan.swift in Sources */,
 				408168F1F5086F5662BABB79 /* ProjectStore.swift in Sources */,
+				BE559F052CB0EA0D6C68AE8F /* ScrubSnapTargets.swift in Sources */,
 				99DC36ED891777F069FF83EF /* ShareSheetView.swift in Sources */,
 				57FF4F413AAC4D2EA45A2221 /* SmartCropEngine.swift in Sources */,
 				18598DB64C3F3AAFF0D0AAC8 /* SpeedControlView.swift in Sources */,

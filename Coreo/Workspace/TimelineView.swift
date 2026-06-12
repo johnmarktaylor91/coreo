@@ -32,6 +32,9 @@ struct TimelineView: View {
     /// Stashed playback state so we can resume after a drag.
     @State private var wasPlayingBeforeDrag: Bool = false
 
+    /// Currently engaged snap target during an interactive drag.
+    @State private var engagedSnapTarget: Double?
+
     /// One color per video track, cycling through the palette.
     private let coverageColors: [Color] = [.blue, .green, .purple, .orange, .pink, .teal]
 
@@ -225,6 +228,15 @@ struct TimelineView: View {
             RoundedRectangle(cornerRadius: 4)
                 .fill(Color.black.opacity(0.4))
 
+            if let region = playback.activeLoopRegion {
+                let startX = xPosition(for: region.startSeconds, in: usableWidth)
+                let endX = xPosition(for: region.endSeconds, in: usableWidth)
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(CoreoColor.accent.opacity(0.22))
+                    .frame(width: max(endX - startX, 1))
+                    .offset(x: startX)
+            }
+
             // Played region
             let playheadX = xPosition(for: playback.currentTimeSeconds, in: usableWidth)
             RoundedRectangle(cornerRadius: 4)
@@ -329,20 +341,50 @@ struct TimelineView: View {
                     Haptic.light()
                     wasPlayingBeforeDrag = playback.isPlaying
                     if playback.isPlaying {
-                        viewModel.togglePlayback()
+                        viewModel.playback.pauseIfNeeded()
                     }
                 }
                 let xInPadded = value.location.x - 8
                 let time = seconds(for: xInPadded, in: usableWidth)
-                viewModel.seek(to: time, precise: false)
+                let snappedTime = snappedScrubTime(candidateSeconds: time, usableWidth: usableWidth)
+                viewModel.seek(to: snappedTime, precise: false)
             }
             .onEnded { _ in
                 isDragging = false
+                engagedSnapTarget = nil
                 viewModel.seek(to: playback.currentTimeSeconds, precise: true)
                 if wasPlayingBeforeDrag, !playback.isPlaying {
-                    viewModel.togglePlayback()
+                    viewModel.playback.resumePlayback()
                 }
                 wasPlayingBeforeDrag = false
             }
+    }
+
+    /// Applies interactive scrub snapping for a candidate finger time.
+    ///
+    /// - Parameters:
+    ///   - candidateSeconds: Finger-derived timeline time.
+    ///   - usableWidth: Drawable timeline width.
+    /// - Returns: Snapped or original timeline time.
+    private func snappedScrubTime(candidateSeconds: Double, usableWidth: CGFloat) -> Double {
+        guard timelineDuration > 0, usableWidth > 0 else { return candidateSeconds }
+        let radiusSeconds = 8.0 * timelineDuration / Double(usableWidth)
+        let target = viewModel.scrubSnapTargets.snappedTarget(
+            candidateSeconds: candidateSeconds,
+            radiusSeconds: radiusSeconds,
+            isEnabled: true
+        )
+
+        guard let target else {
+            engagedSnapTarget = nil
+            return candidateSeconds
+        }
+
+        if engagedSnapTarget != target {
+            engagedSnapTarget = target
+            Haptic.tick()
+        }
+
+        return target
     }
 }
