@@ -93,32 +93,42 @@ struct ExportPlan {
     /// - Throws: `ExportError` if project arrays are inconsistent.
     init(project: CoreoProject, sources: [SourceVideo], renderSize: CGSize) throws {
         try Self.validateProject(project, sources: sources)
+        let planSources = sources.map { source in
+            SourceVideo(
+                index: source.index,
+                syncOffsetSeconds: project.videos[source.index].syncOffsetSeconds,
+                trackTimeRange: source.trackTimeRange,
+                displaySize: source.displaySize,
+                nominalFrameRate: source.nominalFrameRate,
+                hasAudio: source.hasAudio
+            )
+        }
 
         let timelineStart = project.timelineStartSeconds
         clipInserts = Self.makeClipInserts(
-            sources: sources,
+            sources: planSources,
             timelineStart: timelineStart
         )
         timelineEdits = Self.makeTimelineEdits(
             segments: project.speedSegments,
-            sources: sources,
+            sources: planSources,
             timelineStart: timelineStart
         )
         panels = Self.makePanels(
             project: project,
-            sources: sources,
+            sources: planSources,
             renderSize: renderSize
         )
         audioSourceIndex = Self.chooseAudioSource(
             referenceIndex: project.referenceVideoIndex,
-            sources: sources
+            sources: planSources
         )
         mappedContentDurationSeconds = Self.mappedDuration(
             timelineStart: timelineStart,
             timelineEnd: project.timelineEndSeconds,
             segments: project.speedSegments
         )
-        outputFPS = Self.chooseOutputFPS(sources: sources)
+        outputFPS = Self.chooseOutputFPS(sources: planSources)
         estimatedOutputBytes = Self.estimateOutputBytes(
             durationSeconds: mappedContentDurationSeconds + Self.bumperDurationSeconds,
             renderSize: renderSize
@@ -137,21 +147,8 @@ struct ExportPlan {
         timelineStart: Double,
         segments: [SpeedSegment]
     ) -> Double {
-        var mapped = timelineSeconds - timelineStart
-        for segment in segments.sorted(by: { $0.startTimeSeconds < $1.startTimeSeconds }) {
-            guard timelineSeconds > segment.startTimeSeconds else { continue }
-            if segment.isHold {
-                mapped += segment.holdDurationSeconds ?? 1
-                continue
-            }
-
-            guard segment.rate > 0 else { continue }
-            let segmentEnd = segment.endTimeSeconds
-            let affected = min(timelineSeconds, segmentEnd) - segment.startTimeSeconds
-            guard affected > 0 else { continue }
-            mapped += affected / Double(segment.rate) - affected
-        }
-        return mapped
+        TimeMapper(clips: [], speedSegments: segments)
+            .exportTime(forTimeline: timelineSeconds, timelineStart: timelineStart)
     }
 
     /// Computes the normalized top-left crop rect in CIImage coordinates.
@@ -225,18 +222,14 @@ struct ExportPlan {
         _ project: CoreoProject,
         sources: [SourceVideo]
     ) throws {
-        guard project.videos.count == project.syncOffsets.count else {
-            throw ExportError.compositionFailed(
-                "Project sync data is inconsistent. Re-sync your videos before exporting."
-            )
-        }
         guard project.videos.count == sources.count else {
             throw ExportError.compositionFailed("Loaded source count does not match project videos.")
         }
-        guard project.referenceVideoIndex >= 0,
-              project.referenceVideoIndex < project.videos.count
-        else {
+        guard project.videos.indices.contains(project.referenceVideoIndex) else {
             throw ExportError.compositionFailed("Reference video index is invalid.")
+        }
+        guard sources.allSatisfy({ project.videos.indices.contains($0.index) }) else {
+            throw ExportError.compositionFailed("Source video index is invalid.")
         }
     }
 
@@ -315,10 +308,9 @@ struct ExportPlan {
         renderSize: CGSize
     ) -> [Panel] {
         let rects: [CGRect]
-        if let overrides = project.layoutOverrides,
-           overrides.panelRects.count == sources.count
-        {
-            rects = overrides.panelRects.map { rect in
+        let manualOverrides = project.videos.compactMap(\.panelRectOverride)
+        if manualOverrides.count == sources.count {
+            rects = manualOverrides.map { rect in
                 CGRect(
                     x: rect.origin.x * renderSize.width,
                     y: rect.origin.y * renderSize.height,
@@ -356,7 +348,7 @@ struct ExportPlan {
             return Panel(
                 index: source.index,
                 rect: rects[offset],
-                cropRect: project.cropOverrides?[source.index]
+                cropRect: project.videos[source.index].effectiveCropRect
             )
         }
     }

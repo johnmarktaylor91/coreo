@@ -1,7 +1,7 @@
 // LayoutEngine.swift
 // Coreo
 //
-// Calculates optimal split-screen panel layouts for 2-6 videos.
+// Calculates optimal split-screen panel layouts for 1-6 videos.
 // Evaluates candidate row configurations and picks the one that
 // maximizes the total visible (non-letterboxed) video area.
 
@@ -15,7 +15,7 @@ enum LayoutEngine {
     /// total visible video area (minimizing letterboxing/pillarboxing).
     ///
     /// - Parameters:
-    ///   - videoCount: Number of videos (2-6). Values outside this range return an empty array.
+    ///   - videoCount: Number of videos (1-6). Values outside this range return an empty array.
     ///   - aspectRatios: Width/height ratio of each video. Must have `videoCount` elements.
     ///   - containerSize: The available container size in points.
     ///   - gap: Gap between panels in points. Defaults to 4.
@@ -35,7 +35,9 @@ enum LayoutEngine {
             return [CGRect(origin: .zero, size: containerSize)]
         }
 
-        let candidates = layoutVariants(for: videoCount)
+        let candidates = layoutVariants(for: videoCount).filter { rowConfig in
+            rowConfig.reduce(0, +) == videoCount
+        }
         var bestRects: [CGRect] = []
         var bestScore: CGFloat = -1
 
@@ -69,7 +71,7 @@ enum LayoutEngine {
         case 5:
             return [[2, 3], [3, 2]]
         case 6:
-            return [[2, 3], [3, 2], [3, 3], [2, 2, 2]]
+            return [[3, 3], [2, 2, 2]]
         default:
             return []
         }

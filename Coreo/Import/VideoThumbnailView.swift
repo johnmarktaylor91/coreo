@@ -30,7 +30,7 @@ struct VideoThumbnailView: View {
                 removeButton
             }
 
-            Text(video.localURL.lastPathComponent)
+            Text(video.originalFilename)
                 .font(.system(size: 10))
                 .foregroundColor(.gray)
                 .lineLimit(1)

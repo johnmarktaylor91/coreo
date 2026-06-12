@@ -64,18 +64,10 @@ enum ExportEngine {
             throw ExportError.noVideos
         }
 
-        guard project.videos.count == project.syncOffsets.count else {
-            throw ExportError.compositionFailed(
-                "Project sync data is inconsistent. Re-sync your videos before exporting."
-            )
-        }
-
         try Task.checkCancellation()
 
-        // Sanitize stale scalar indices before using them. Sync-offset count was
-        // validated above so this cannot silently zero alignment data.
         var project = project
-        project.sanitizeIndices()
+        project.sanitizeReferences()
 
         progressHandler(0.0)
 
@@ -188,7 +180,7 @@ enum ExportEngine {
         var sources: [LoadedSource] = []
         for (index, video) in project.videos.enumerated() {
             try Task.checkCancellation()
-            let asset = AVURLAsset(url: video.localURL)
+            let asset = AVURLAsset(url: ProjectStore().mediaURL(for: video, projectID: project.id))
             let videoTracks = try await asset.loadTracks(withMediaType: .video)
             guard let videoTrack = videoTracks.first else {
                 throw ExportError.compositionFailed("Video \(index) has no video track.")
@@ -272,7 +264,7 @@ enum ExportEngine {
            )
         {
             let insertTime = CMTime(
-                seconds: max(0, project.syncOffsets[audioIndex] - project.timelineStartSeconds),
+                seconds: max(0, project.videos[audioIndex].syncOffsetSeconds - project.timelineStartSeconds),
                 preferredTimescale: timescale
             )
             try compAudioTrack.insertTimeRange(
@@ -570,7 +562,7 @@ enum ExportEngine {
         sources.enumerated().map { index, source in
             ExportPlan.SourceVideo(
                 index: index,
-                syncOffsetSeconds: project.syncOffsets[index],
+                syncOffsetSeconds: project.videos[index].syncOffsetSeconds,
                 trackTimeRange: source.videoTimeRange,
                 displaySize: source.displaySize,
                 nominalFrameRate: source.nominalFrameRate,

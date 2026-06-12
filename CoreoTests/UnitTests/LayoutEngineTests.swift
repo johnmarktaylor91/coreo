@@ -162,14 +162,6 @@ final class LayoutEngineTests: XCTestCase {
         )
         XCTAssertTrue(rects0.isEmpty)
 
-        let rects1 = LayoutEngine.calculateLayout(
-            videoCount: 1,
-            aspectRatios: [16.0 / 9.0],
-            containerSize: container,
-            gap: gap
-        )
-        XCTAssertTrue(rects1.isEmpty)
-
         let rects7 = LayoutEngine.calculateLayout(
             videoCount: 7,
             aspectRatios: Array(repeating: 16.0 / 9.0, count: 7),
@@ -219,5 +211,34 @@ final class LayoutEngineTests: XCTestCase {
             gap: gap
         )
         XCTAssertEqual(rects.count, 6)
+    }
+
+    func testOneThroughSixLayoutsHaveCorrectCountAndCoverage() {
+        let containers = [
+            CGSize(width: 1000, height: 600),
+            CGSize(width: 390, height: 844),
+            CGSize(width: 1920, height: 1080),
+        ]
+
+        for container in containers {
+            for count in 1...6 {
+                let rects = LayoutEngine.calculateLayout(
+                    videoCount: count,
+                    aspectRatios: Array(repeating: 16.0 / 9.0, count: count),
+                    containerSize: container,
+                    gap: gap
+                )
+
+                XCTAssertEqual(rects.count, count, "Wrong count for \(count) in \(container)")
+                for rect in rects {
+                    XCTAssertGreaterThan(rect.width, 0)
+                    XCTAssertGreaterThan(rect.height, 0)
+                    XCTAssertGreaterThanOrEqual(rect.minX, 0)
+                    XCTAssertGreaterThanOrEqual(rect.minY, 0)
+                    XCTAssertLessThanOrEqual(rect.maxX, container.width + 0.1)
+                    XCTAssertLessThanOrEqual(rect.maxY, container.height + 0.1)
+                }
+            }
+        }
     }
 }

@@ -46,11 +46,30 @@ final class ImportViewModel: ObservableObject {
     /// confirmation of unreliable videos.
     private var pendingSyncOutput: AudioSyncOutput?
 
+    /// Draft project identity used to copy imported media before sync.
+    let projectID: UUID
+
+    /// Store used for copied media and project persistence.
+    let projectStore: ProjectStore
+
     /// Maximum supported videos for one Coreo project.
     nonisolated static let maxVideoCount: Int = 6
 
     /// Maximum file imports to process at once.
     private nonisolated static let maxConcurrentImports: Int = 3
+
+    // MARK: - Init
+
+    /// Creates an import view model.
+    ///
+    /// - Parameters:
+    ///   - projectID: Draft project identity used for copied media.
+    ///   - projectStore: Project store used for media copy operations.
+    init(projectID: UUID = UUID(), projectStore: ProjectStore = ProjectStore()) {
+        self.projectID = projectID
+        self.projectStore = projectStore
+        projectStore.removeLegacyProjectFile()
+    }
 
     // MARK: - Types
 
@@ -107,7 +126,7 @@ final class ImportViewModel: ObservableObject {
         syncError = nil
         let filename = url.lastPathComponent
         do {
-            let asset = try await VideoAsset.from(url: url)
+            let asset = try await projectStore.importVideo(from: url, projectID: projectID)
             videos.append(asset)
         } catch {
             recordImportError(filename: filename, message: error.localizedDescription, retryURL: url)
@@ -170,7 +189,9 @@ final class ImportViewModel: ObservableObject {
     func removeVideo(at index: Int) {
         guard !isSyncing else { return }
         guard videos.indices.contains(index) else { return }
+        let removed = videos[index]
         videos.remove(at: index)
+        projectStore.deleteMedia(for: removed, projectID: projectID)
         syncError = nil
     }
 
@@ -197,7 +218,9 @@ final class ImportViewModel: ObservableObject {
 
         do {
             let videoSnapshot = videos
-            let inputs = videoSnapshot.map { (url: $0.localURL, audioBitrate: $0.audioBitrate) }
+            let inputs = videoSnapshot.map {
+                (url: projectStore.mediaURL(for: $0, projectID: projectID), audioBitrate: $0.audioBitrate)
+            }
             let output = try await AudioSyncEngine.sync(videos: inputs) { phase, fraction in
                 Task { @MainActor in
                     switch phase {
@@ -217,7 +240,7 @@ final class ImportViewModel: ObservableObject {
                 guard !result.isReliable else { return nil }
                 let idx = result.videoIndex
                 let name = idx < videoSnapshot.count
-                    ? videoSnapshot[idx].localURL.lastPathComponent
+                    ? videoSnapshot[idx].originalFilename
                     : "Video \(idx)"
                 let reason: String
                 switch result.status {
@@ -291,12 +314,12 @@ final class ImportViewModel: ObservableObject {
             // Remove unreliable videos and rebuild
             let unreliableIndices = Set(unreliableVideos.map(\.index))
             var filteredVideos: [VideoAsset] = []
-            var filteredOffsets: [TimeInterval] = []
 
             for (index, video) in videos.enumerated() {
                 if !unreliableIndices.contains(index), index < output.offsets.count {
                     filteredVideos.append(video)
-                    filteredOffsets.append(output.offsets[index])
+                } else if unreliableIndices.contains(index) {
+                    projectStore.deleteMedia(for: video, projectID: projectID)
                 }
             }
 
@@ -309,16 +332,15 @@ final class ImportViewModel: ObservableObject {
 
             videos = filteredVideos
 
-            var project = CoreoProject(
-                name: "New Project",
+            var project = makeProject(
+                from: output,
                 videos: filteredVideos,
-                referenceVideoIndex: 0,
-                syncOffsets: filteredOffsets
+                referenceIndex: 0,
+                audioSourceIndex: selectBestAudioSource(from: filteredVideos)
             )
-            project.audioSourceIndex = selectBestAudioSource(from: filteredVideos)
             syncPhaseLabel = "Finding dancers..."
             syncProgress = 0.75
-            project.cropOverrides = await computeCropOverrides(for: filteredVideos)
+            await applyCropOverrides(to: &project)
             syncProgress = 1
             pendingSyncOutput = nil
             Haptic.success()
@@ -350,15 +372,40 @@ final class ImportViewModel: ObservableObject {
     /// Constructs a CoreoProject from sync output, applying offsets,
     /// selecting the best audio source, and computing smart crop rects.
     private func buildProject(from output: AudioSyncOutput, videos videoList: [VideoAsset]) async -> CoreoProject {
-        var project = CoreoProject(
-            name: "New Project",
+        var project = makeProject(
+            from: output,
             videos: videoList,
-            referenceVideoIndex: output.referenceIndex,
-            syncOffsets: output.offsets
+            referenceIndex: output.referenceIndex,
+            audioSourceIndex: output.audioSourceIndex
         )
-        project.audioSourceIndex = output.audioSourceIndex
-        project.cropOverrides = await computeCropOverrides(for: videoList)
+        await applyCropOverrides(to: &project)
         return project
+    }
+
+    /// Constructs a project from videos and sync output.
+    private func makeProject(
+        from output: AudioSyncOutput,
+        videos videoList: [VideoAsset],
+        referenceIndex: Int,
+        audioSourceIndex: Int
+    ) -> CoreoProject {
+        var updatedVideos = videoList
+        for index in updatedVideos.indices {
+            updatedVideos[index].syncOffsetSeconds = index < output.offsets.count ? output.offsets[index] : 0
+            if let result = output.results.first(where: { $0.videoIndex == index }) {
+                updatedVideos[index].syncStatus = result.status
+            }
+        }
+
+        let safeReferenceIndex = updatedVideos.indices.contains(referenceIndex) ? referenceIndex : 0
+        let safeAudioIndex = updatedVideos.indices.contains(audioSourceIndex) ? audioSourceIndex : safeReferenceIndex
+        return CoreoProject(
+            id: projectID,
+            name: "New Project",
+            videos: updatedVideos,
+            referenceVideoID: updatedVideos[safeReferenceIndex].id,
+            audioSourceVideoID: updatedVideos[safeAudioIndex].id
+        )
     }
 
     /// Imports selected URLs with bounded concurrency.
@@ -377,7 +424,10 @@ final class ImportViewModel: ObservableObject {
 
                     group.addTask {
                         do {
-                            let asset = try await VideoAsset.from(url: url)
+                            let asset = try await self.projectStore.importVideo(
+                                from: url,
+                                projectID: self.projectID
+                            )
                             return (index, .success(asset))
                         } catch {
                             return (index, .failure(ImportFailure(url: url, error: error)))
@@ -416,19 +466,18 @@ final class ImportViewModel: ObservableObject {
         let error: Error
     }
 
-    /// Runs person detection on each video and produces a crop-overrides
-    /// dictionary keyed by video index.
-    private func computeCropOverrides(for videoList: [VideoAsset]) async -> [Int: CGRect] {
-        let inputs = videoList.map { (url: $0.localURL, dimensions: $0.dimensions) }
+    /// Runs person detection on each video and stores auto-crop rects.
+    private func applyCropOverrides(to project: inout CoreoProject) async {
+        let inputs = project.videos.map {
+            (url: projectStore.mediaURL(for: $0, projectID: projectID), dimensions: $0.dimensions)
+        }
         let cropRects = await SmartCropEngine.computeCropRects(for: inputs)
 
-        var overrides: [Int: CGRect] = [:]
         for (index, rect) in cropRects.enumerated() {
-            if let rect {
-                overrides[index] = rect
+            if project.videos.indices.contains(index) {
+                project.videos[index].autoCropRect = rect
             }
         }
-        return overrides.isEmpty ? [:] : overrides
     }
 
     /// Picks the video with the highest audio bitrate as the audio source.

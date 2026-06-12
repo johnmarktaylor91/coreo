@@ -36,7 +36,7 @@ struct VideoGridView: View {
                         forIndex: index,
                         at: viewModel.currentTimeSeconds
                     )
-                    let cropRect = viewModel.project.cropOverrides?[index]
+                    let cropRect = viewModel.project.videos[index].effectiveCropRect
 
                     VideoPanelView(
                         player: viewModel.players[index],
@@ -61,9 +61,9 @@ struct VideoGridView: View {
     /// User overrides are stored as normalized (0-1) rects and scaled
     /// to the current container size.
     private var panelRects: [CGRect] {
-        // Use manual layout overrides if the user has set them.
-        if let overrides = viewModel.project.layoutOverrides {
-            return overrides.panelRects.map { normalized in
+        let manualOverrides = viewModel.project.videos.compactMap(\.panelRectOverride)
+        if manualOverrides.count == viewModel.project.videos.count {
+            return manualOverrides.map { normalized in
                 CGRect(
                     x: normalized.origin.x * containerSize.width,
                     y: normalized.origin.y * containerSize.height,

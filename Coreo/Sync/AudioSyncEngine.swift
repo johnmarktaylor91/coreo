@@ -8,7 +8,7 @@
 import Foundation
 
 /// Per-video sync state reported by the audio sync engine.
-enum SyncStatus: Equatable {
+enum SyncStatus: Codable, Equatable {
     /// The clip was synced against the selected reference.
     case synced
 

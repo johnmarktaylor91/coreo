@@ -139,9 +139,7 @@ struct TimelineView: View {
             Color.clear
 
             ForEach(Array(viewModel.project.videos.enumerated()), id: \.offset) { index, video in
-                let offset = index < viewModel.project.syncOffsets.count
-                    ? viewModel.project.syncOffsets[index]
-                    : 0
+                let offset = video.syncOffsetSeconds
                 let videoStart = offset
                 let videoEnd = offset + video.durationSeconds
 

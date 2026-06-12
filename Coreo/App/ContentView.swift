@@ -11,11 +11,22 @@ import SwiftUI
 /// Root view that manages navigation between Import and Workspace screens.
 struct ContentView: View {
     @State private var currentProject: CoreoProject?
+    @State private var lastProject: LoadedProject?
+    private let projectStore = ProjectStore()
 
     var body: some View {
         NavigationStack {
-            ImportView(onSyncComplete: { project in
+            ImportView(lastProject: lastProject, onContinueProject: { project in
                 currentProject = project
+                lastProject = nil
+            }, onStartNew: {
+                if let id = lastProject?.project.id {
+                    projectStore.deleteProject(projectID: id)
+                }
+                lastProject = nil
+            }, onSyncComplete: { project in
+                currentProject = project
+                lastProject = nil
             })
             .navigationDestination(isPresented: Binding(
                 get: { currentProject != nil },
@@ -27,5 +38,9 @@ struct ContentView: View {
             }
         }
         .tint(Color(red: 1.0, green: 0.42, blue: 0.21))
+        .onAppear {
+            guard lastProject == nil, currentProject == nil else { return }
+            lastProject = projectStore.loadMostRecentProject()
+        }
     }
 }

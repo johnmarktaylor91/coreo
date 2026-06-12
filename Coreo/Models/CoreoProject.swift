@@ -2,18 +2,18 @@
 // Coreo
 //
 // The top-level project model. Contains all state for one multi-angle
-// video session: videos, sync offsets, layout, speed, annotations, and trim.
+// video session: videos, layout, speed, annotations, and trim.
 
 import Foundation
 
-/// User-specified panel positions and sizes for the split-screen layout.
-struct LayoutOverrides: Codable {
-    /// Normalized (0-1) rectangles for each panel position.
-    var panelRects: [CGRect]
-}
-
 /// The main project data model for a Coreo multi-angle video session.
 struct CoreoProject: Codable, Identifiable {
+    /// Current project document schema.
+    static let currentSchemaVersion: Int = 1
+
+    /// Persisted schema version.
+    let schemaVersion: Int
+
     /// Unique identifier for this project.
     let id: UUID
 
@@ -26,18 +26,8 @@ struct CoreoProject: Codable, Identifiable {
     /// Imported video assets in display order.
     var videos: [VideoAsset]
 
-    /// Index into `videos` indicating which video is the sync reference (offset = 0).
-    var referenceVideoIndex: Int
-
-    /// Per-video time offset in seconds relative to the reference video.
-    /// `syncOffsets[referenceVideoIndex]` should always be 0.
-    var syncOffsets: [TimeInterval]
-
-    /// Optional user-specified panel layout overrides.
-    var layoutOverrides: LayoutOverrides?
-
-    /// Optional per-panel crop rectangles in normalized (0-1) coordinates, keyed by video index.
-    var cropOverrides: [Int: CGRect]?
+    /// Video ID indicating the sync reference.
+    var referenceVideoID: UUID?
 
     /// Speed and hold modifications applied to the timeline.
     var speedSegments: [SpeedSegment]
@@ -45,60 +35,127 @@ struct CoreoProject: Codable, Identifiable {
     /// Time-stamped annotations (drawings, text, arrows).
     var annotations: [TimedAnnotation]
 
-    /// Start of the user's trim range in seconds, or nil if no trim is applied.
+    /// Start of the user's unified trim range in seconds, or nil if no trim is applied.
     var timelineTrimStartSeconds: Double?
 
-    /// Duration of the user's trim range in seconds, or nil if no trim is applied.
+    /// Duration of the user's unified trim range in seconds, or nil if no trim is applied.
     var timelineTrimDurationSeconds: Double?
 
-    /// Index into `videos` indicating which video's audio track to use for export.
-    var audioSourceIndex: Int
+    /// Video ID indicating which video's audio track to use for export.
+    var audioSourceVideoID: UUID?
 
     // MARK: - Initializer
 
     /// Creates a new project with sensible defaults.
     ///
     /// - Parameters:
+    ///   - id: Stable project identity.
     ///   - name: Project name. Defaults to "Untitled Project".
     ///   - videos: Initial video assets. Defaults to empty.
+    ///   - referenceVideoID: Sync reference video ID.
+    ///   - audioSourceVideoID: Export/playback audio source ID.
+    ///   - createdAt: Creation date.
     init(
         id: UUID = UUID(),
         name: String = "Untitled Project",
         videos: [VideoAsset] = [],
-        referenceVideoIndex: Int = 0,
-        syncOffsets: [TimeInterval]? = nil,
+        referenceVideoID: UUID? = nil,
+        audioSourceVideoID: UUID? = nil,
         createdAt: Date = Date()
     ) {
+        schemaVersion = Self.currentSchemaVersion
         self.id = id
         self.name = name
         self.createdAt = createdAt
         self.videos = videos
-        self.referenceVideoIndex = referenceVideoIndex
-        self.syncOffsets = syncOffsets ?? Array(repeating: 0.0, count: videos.count)
-        self.layoutOverrides = nil
-        self.cropOverrides = nil
+        self.referenceVideoID = referenceVideoID ?? videos.first?.id
         self.speedSegments = []
         self.annotations = []
         self.timelineTrimStartSeconds = nil
         self.timelineTrimDurationSeconds = nil
-        self.audioSourceIndex = 0
+        self.audioSourceVideoID = audioSourceVideoID ?? videos.first?.id
     }
 
     // MARK: - Validation
 
-    /// Clamps stale indices to valid ranges. Call after any mutation that
-    /// changes the `videos` array (add/remove/reorder).
-    mutating func sanitizeIndices() {
-        if videos.isEmpty {
-            referenceVideoIndex = 0
-            audioSourceIndex = 0
-            syncOffsets = []
+    /// Clamps stale IDs to valid video identities.
+    mutating func sanitizeReferences() {
+        guard !videos.isEmpty else {
+            referenceVideoID = nil
+            audioSourceVideoID = nil
             return
         }
-        referenceVideoIndex = min(referenceVideoIndex, videos.count - 1)
-        audioSourceIndex = min(audioSourceIndex, videos.count - 1)
-        if syncOffsets.count != videos.count {
-            syncOffsets = Array(repeating: 0.0, count: videos.count)
+        let ids = Set(videos.map(\.id))
+        if referenceVideoID.map({ ids.contains($0) }) != true {
+            referenceVideoID = videos.first?.id
+        }
+        if audioSourceVideoID.map({ ids.contains($0) }) != true {
+            audioSourceVideoID = videos.first(where: { $0.audioBitrate > 0 })?.id ?? videos.first?.id
+        }
+    }
+
+    /// Removes the video with the supplied ID and updates stale references.
+    ///
+    /// - Parameter id: Video identity to remove.
+    mutating func removeVideo(id: UUID) {
+        videos.removeAll { $0.id == id }
+        sanitizeReferences()
+    }
+
+    // MARK: - Lookup Helpers
+
+    /// Returns the display index for a video ID.
+    ///
+    /// - Parameter id: Video identity.
+    /// - Returns: Index in `videos`, or nil if absent.
+    func index(forVideoID id: UUID?) -> Int? {
+        guard let id else { return nil }
+        return videos.firstIndex { $0.id == id }
+    }
+
+    /// Returns the video for a stable ID.
+    ///
+    /// - Parameter id: Video identity.
+    /// - Returns: Matching video, or nil.
+    func video(id: UUID?) -> VideoAsset? {
+        guard let id else { return nil }
+        return videos.first { $0.id == id }
+    }
+
+    /// Sync offset for the video at the supplied display index.
+    ///
+    /// - Parameter index: Index in `videos`.
+    /// - Returns: Per-clip sync offset, or zero if the index is invalid.
+    func syncOffset(at index: Int) -> TimeInterval {
+        guard videos.indices.contains(index) else { return 0 }
+        return videos[index].syncOffsetSeconds
+    }
+
+    /// Project root for this project under the supplied store root.
+    ///
+    /// - Parameter storeRoot: Root Projects directory.
+    /// - Returns: Project directory URL.
+    func projectDirectory(in storeRoot: URL) -> URL {
+        storeRoot.appendingPathComponent(id.uuidString, isDirectory: true)
+    }
+
+    // MARK: - Compatibility Indices
+
+    /// Reference video display index for index-based UI and AVPlayer arrays.
+    var referenceVideoIndex: Int {
+        get { index(forVideoID: referenceVideoID) ?? 0 }
+        set {
+            guard videos.indices.contains(newValue) else { return }
+            referenceVideoID = videos[newValue].id
+        }
+    }
+
+    /// Audio source display index for index-based UI and AVPlayer arrays.
+    var audioSourceIndex: Int {
+        get { index(forVideoID: audioSourceVideoID) ?? 0 }
+        set {
+            guard videos.indices.contains(newValue) else { return }
+            audioSourceVideoID = videos[newValue].id
         }
     }
 
@@ -106,81 +163,34 @@ struct CoreoProject: Codable, Identifiable {
 
     /// The earliest point on the timeline (minimum sync offset, often 0 or negative).
     var timelineStartSeconds: Double {
-        guard !syncOffsets.isEmpty else { return 0 }
-        return syncOffsets.min() ?? 0
+        guard !videos.isEmpty else { return 0 }
+        return videos.map(\.syncOffsetSeconds).min() ?? 0
     }
 
     /// The latest point on the timeline (maximum of each video's offset + duration).
     var timelineEndSeconds: Double {
-        guard !videos.isEmpty, videos.count == syncOffsets.count else { return 0 }
-        var maxEnd: Double = 0
-        for i in videos.indices {
-            let videoEnd = syncOffsets[i] + videos[i].durationSeconds
-            maxEnd = max(maxEnd, videoEnd)
-        }
-        return maxEnd
+        guard !videos.isEmpty else { return 0 }
+        return videos
+            .map { $0.syncOffsetSeconds + $0.durationSeconds }
+            .max() ?? 0
     }
 
     /// Total span of the timeline from earliest start to latest end.
     var timelineDurationSeconds: Double {
-        return timelineEndSeconds - timelineStartSeconds
+        timelineEndSeconds - timelineStartSeconds
     }
 
     /// The time where ALL videos overlap begins (max of all start offsets).
     var overlapStartSeconds: Double {
-        guard !syncOffsets.isEmpty else { return 0 }
-        return syncOffsets.max() ?? 0
+        guard !videos.isEmpty else { return 0 }
+        return videos.map(\.syncOffsetSeconds).max() ?? 0
     }
 
     /// The time where ALL videos overlap ends (min of all video end times).
     var overlapEndSeconds: Double {
-        guard !videos.isEmpty, videos.count == syncOffsets.count else { return 0 }
-        var minEnd: Double = .greatestFiniteMagnitude
-        for i in videos.indices {
-            let videoEnd = syncOffsets[i] + videos[i].durationSeconds
-            minEnd = min(minEnd, videoEnd)
-        }
-        return minEnd == .greatestFiniteMagnitude ? 0 : minEnd
-    }
-
-    // MARK: - Persistence
-
-    /// The filename used for on-disk storage.
-    private static let filename = "coreo_project.json"
-
-    /// Returns the full file URL in the app's Documents directory.
-    private static var fileURL: URL {
-        let documentsDirectory = FileManager.default.urls(
-            for: .documentDirectory,
-            in: .userDomainMask
-        ).first!  // Documents directory always exists on iOS
-        return documentsDirectory.appendingPathComponent(filename)
-    }
-
-    /// Persists this project to the app's Documents directory as JSON.
-    func save() throws {
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        let data = try encoder.encode(self)
-        try data.write(to: CoreoProject.fileURL, options: .atomic)
-    }
-
-    /// Loads a previously saved project from the Documents directory.
-    ///
-    /// - Returns: The decoded project, or nil if no saved file exists or decoding fails.
-    static func load() -> CoreoProject? {
-        let url = fileURL
-        guard FileManager.default.fileExists(atPath: url.path) else {
-            return nil
-        }
-        do {
-            let data = try Data(contentsOf: url)
-            let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .iso8601
-            return try decoder.decode(CoreoProject.self, from: data)
-        } catch {
-            return nil
-        }
+        guard !videos.isEmpty else { return 0 }
+        return videos
+            .map { $0.syncOffsetSeconds + $0.durationSeconds }
+            .min() ?? 0
     }
 }

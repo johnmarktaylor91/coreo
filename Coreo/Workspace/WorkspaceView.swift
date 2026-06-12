@@ -38,6 +38,10 @@ struct WorkspaceView: View {
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
 
+            if !viewModel.missingVideos.isEmpty {
+                missingMediaPanel
+            }
+
             // MARK: Video Grid
             GeometryReader { geometry in
                 ZStack {
@@ -223,6 +227,31 @@ struct WorkspaceView: View {
         .background(Color(red: 0.1, green: 0.1, blue: 0.1).opacity(0.95))
     }
 
+    /// Warning panel for copied media files missing from disk.
+    private var missingMediaPanel: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(viewModel.missingVideos) { video in
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .foregroundColor(accentCoral)
+                    Text("\(video.originalFilename) is missing")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.85))
+                        .lineLimit(1)
+                    Spacer()
+                    Button("Remove") {
+                        viewModel.removeMissingVideo(id: video.id)
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(accentCoral)
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(Color(red: 0.13, green: 0.11, blue: 0.1))
+    }
+
     /// Thin vertical divider for the edit tools row.
     private var toolDivider: some View {
         Divider()
@@ -241,7 +270,7 @@ struct WorkspaceView: View {
                     viewModel.setAudioSource(index: index)
                 } label: {
                     HStack {
-                        Text(video.localURL.lastPathComponent)
+                        Text(video.originalFilename)
                         if index == viewModel.project.audioSourceIndex {
                             Image(systemName: "checkmark")
                         }

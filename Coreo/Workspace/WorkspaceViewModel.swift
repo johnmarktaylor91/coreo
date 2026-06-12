@@ -16,7 +16,11 @@ final class WorkspaceViewModel: ObservableObject {
     // MARK: - Project State
 
     /// The project being viewed/edited. Mutated for settings like audioSourceIndex.
-    @Published var project: CoreoProject
+    @Published var project: CoreoProject {
+        didSet {
+            scheduleAutosave()
+        }
+    }
 
     // MARK: - Playback State
 
@@ -57,6 +61,12 @@ final class WorkspaceViewModel: ObservableObject {
 
     /// The active export task, kept so it can be cancelled.
     private var exportTask: Task<Void, Never>?
+
+    /// The project store used for media URL resolution and autosave.
+    private let projectStore: ProjectStore
+
+    /// Debounced autosave task.
+    private var autosaveTask: Task<Void, Never>?
 
     // MARK: - Players
 
@@ -103,14 +113,20 @@ final class WorkspaceViewModel: ObservableObject {
         project.timelineDurationSeconds
     }
 
+    /// Videos whose copied media files are missing.
+    var missingVideos: [VideoAsset] {
+        project.videos.filter { $0.mediaAvailability == .missing }
+    }
+
     // MARK: - Init / Deinit
 
     /// Creates the view model, builds one AVPlayer per video, configures
     /// audio routing and sync offsets, and installs the periodic time observer.
     ///
     /// - Parameter project: The project to display in the workspace.
-    init(project: CoreoProject) {
+    init(project: CoreoProject, projectStore: ProjectStore = ProjectStore()) {
         self.project = project
+        self.projectStore = projectStore
         setupPlayers()
         installTimeObserver()
         observeEndOfPlayback()
@@ -375,6 +391,32 @@ final class WorkspaceViewModel: ObservableObject {
         }
     }
 
+    /// Removes a missing-media video from the project and rebuilds players.
+    ///
+    /// - Parameter id: Video identity to remove.
+    func removeMissingVideo(id: UUID) {
+        guard let index = project.index(forVideoID: id) else { return }
+        let wasPlaying = isPlaying
+        pauseAll()
+        if let observer = timeObserver, timeObserverPlayerIndex < players.count {
+            players[timeObserverPlayerIndex].removeTimeObserver(observer)
+            timeObserver = nil
+        }
+        cancellables.removeAll()
+        projectStore.deleteMedia(for: project.videos[index], projectID: project.id)
+        project.removeVideo(id: id)
+        players.removeAll()
+        setupPlayers()
+        installTimeObserver()
+        observeEndOfPlayback()
+        if wasPlaying, !players.isEmpty {
+            playAll()
+            isPlaying = true
+        } else {
+            isPlaying = false
+        }
+    }
+
     // MARK: - Video Availability
 
     /// Whether a video has content at the given timeline position.
@@ -384,12 +426,10 @@ final class WorkspaceViewModel: ObservableObject {
     ///   - timelineSeconds: Position on the timeline.
     /// - Returns: True if the video's local time is within its duration.
     func isVideoActive(index: Int, at timelineSeconds: Double) -> Bool {
-        guard index >= 0, index < project.videos.count,
-              index < project.syncOffsets.count
-        else {
+        guard index >= 0, index < project.videos.count else {
             return false
         }
-        let videoSeconds = timelineSeconds - project.syncOffsets[index]
+        let videoSeconds = timelineSeconds - project.videos[index].syncOffsetSeconds
         return videoSeconds >= 0 && videoSeconds <= project.videos[index].durationSeconds
     }
 
@@ -400,12 +440,10 @@ final class WorkspaceViewModel: ObservableObject {
     ///   - timelineSeconds: Current playhead position.
     /// - Returns: A label like "Starts in 0:04" or "Ended", or nil if the video is active.
     func inactiveLabel(forIndex index: Int, at timelineSeconds: Double) -> String? {
-        guard index >= 0, index < project.videos.count,
-              index < project.syncOffsets.count
-        else {
+        guard index >= 0, index < project.videos.count else {
             return nil
         }
-        let videoSeconds = timelineSeconds - project.syncOffsets[index]
+        let videoSeconds = timelineSeconds - project.videos[index].syncOffsetSeconds
         if videoSeconds < 0 {
             return "Starts in \(TimeFormatting.formatShort(-videoSeconds))"
         } else if videoSeconds > project.videos[index].durationSeconds {
@@ -419,7 +457,7 @@ final class WorkspaceViewModel: ObservableObject {
     /// Creates one AVPlayer per video, configures audio routing and initial seek.
     private func setupPlayers() {
         players = project.videos.map { video in
-            let item = AVPlayerItem(url: video.localURL)
+            let item = AVPlayerItem(url: projectStore.mediaURL(for: video, projectID: project.id))
             item.preferredForwardBufferDuration = 5
             let player = AVPlayer(playerItem: item)
             player.automaticallyWaitsToMinimizeStalling = false
@@ -460,8 +498,8 @@ final class WorkspaceViewModel: ObservableObject {
                 guard let self, isPlaying else { return }
                 let refSeconds = CMTimeGetSeconds(cmTime)
                 guard refSeconds.isFinite else { return }
-                guard validReferenceIndex < project.syncOffsets.count else { return }
-                let timelineTime = refSeconds + project.syncOffsets[validReferenceIndex]
+                guard validReferenceIndex < project.videos.count else { return }
+                let timelineTime = refSeconds + project.videos[validReferenceIndex].syncOffsetSeconds
                 currentTimeSeconds = timelineTime
                 applyLiveSpeedSegment(at: timelineTime)
             }
@@ -502,6 +540,7 @@ final class WorkspaceViewModel: ObservableObject {
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self else { return }
+                saveImmediately()
                 wasPlayingBeforeBackground = isPlaying
                 if isPlaying {
                     pauseAll()
@@ -557,10 +596,10 @@ final class WorkspaceViewModel: ObservableObject {
 
     /// Converts a timeline position to a per-video CMTime, accounting for sync offset.
     private func videoTime(forTimeline timelineSeconds: Double, videoIndex: Int) -> CMTime {
-        guard videoIndex >= 0, videoIndex < project.syncOffsets.count else {
+        guard videoIndex >= 0, videoIndex < project.videos.count else {
             return .zero
         }
-        let videoSeconds = timelineSeconds - project.syncOffsets[videoIndex]
+        let videoSeconds = timelineSeconds - project.videos[videoIndex].syncOffsetSeconds
         return CMTime(seconds: max(0, videoSeconds), preferredTimescale: 600)
     }
 
@@ -598,6 +637,30 @@ final class WorkspaceViewModel: ObservableObject {
         return min(project.referenceVideoIndex, players.count - 1)
     }
 
+    /// Schedules a debounced autosave after project mutations.
+    private func scheduleAutosave() {
+        autosaveTask?.cancel()
+        let snapshot = project
+        let store = projectStore
+        autosaveTask = Task {
+            do {
+                try await Task.sleep(nanoseconds: 2_000_000_000)
+                try store.save(snapshot)
+            } catch is CancellationError {
+                return
+            } catch {
+                return
+            }
+        }
+    }
+
+    /// Saves the current project immediately.
+    private func saveImmediately() {
+        autosaveTask?.cancel()
+        autosaveTask = nil
+        try? projectStore.save(project)
+    }
+
     /// Pauses all players and removes the time observer.
     /// Called explicitly when the workspace is dismissed.
     func tearDown() {
@@ -610,6 +673,8 @@ final class WorkspaceViewModel: ObservableObject {
         }
         cancellables.removeAll()
         exportTask?.cancel()
+        saveImmediately()
+        autosaveTask?.cancel()
         if let bg = backgroundObserver {
             NotificationCenter.default.removeObserver(bg)
             backgroundObserver = nil

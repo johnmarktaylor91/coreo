@@ -9,10 +9,10 @@
 /* Begin PBXBuildFile section */
 		025333983E82CCB388C07593 /* PersonDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = D500C31358952D2B2B0FAEF4 /* PersonDetector.swift */; };
 		04B933A9922BB74821C2EC9A /* TextAnnotationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90718819F8E6772FBCEE7DF7 /* TextAnnotationView.swift */; };
+		0D9190ED50440ABA002B1D11 /* TimeMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 967070AE92BF269CB742DE76 /* TimeMapper.swift */; };
 		0DBBB0C8973EE59168E7DBAE /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = F53C8516EFED7C37FB2D8336 /* DesignSystem.swift */; };
 		0EAE865536F349288705D643 /* VideoGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAC4621903D1097792D1D1FA /* VideoGridView.swift */; };
 		168515ECCA30A987484393C2 /* ExportSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B40B7EB935411EB76E3A8C90 /* ExportSettings.swift */; };
-		17D4C1E8A9B0455AB5E8D3F2 /* ExportPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A82D1B8AB8F4E8D9BE84F21 /* ExportPlan.swift */; };
 		16E4C26022BB6A2ABE8910AC /* AnnotationToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD3BC9669CA59FFAF4E59395 /* AnnotationToolbar.swift */; };
 		18598DB64C3F3AAFF0D0AAC8 /* SpeedControlView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 848F2882E6ABE131985BA616 /* SpeedControlView.swift */; };
 		295731025BB8BE4D3513B326 /* AnnotationModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58CB611F8B2FB596771CBDD3 /* AnnotationModelTests.swift */; };
@@ -20,8 +20,8 @@
 		394681F90A3007CEC4CE75EB /* ExportEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2412335955689EC824A5176 /* ExportEngine.swift */; };
 		3E9FD381B8ADA32A73C2FD56 /* TimeFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78F1A7D9A2CAB2FD38866CB5 /* TimeFormatting.swift */; };
 		407847321F6B79C95952D3B5 /* VideoThumbnailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA96B593548A25D4AA38C869 /* VideoThumbnailView.swift */; };
+		408168F1F5086F5662BABB79 /* ProjectStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FAFFD4521E9245038C8190E /* ProjectStore.swift */; };
 		419D95B2E7F400E1532695C0 /* ArrowAnnotationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A27504774982A729418B34BE /* ArrowAnnotationView.swift */; };
-		43D81A81F7E44D40A7B0BB2A /* ExportPlanTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C6E07C44731422080C47A69 /* ExportPlanTests.swift */; };
 		540A2FB954CC4338A7A3F735 /* FFTHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9DD7A94D95FD0BE852551F1 /* FFTHelper.swift */; };
 		56298196B45A1871D73E4473 /* AnnotationOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A7CC39B4F38C14EC537FAA0 /* AnnotationOverlayView.swift */; };
 		5650A40D272153DABC7FEE49 /* ImportViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3590416D6841AF648EAF5F1 /* ImportViewModel.swift */; };
@@ -34,9 +34,11 @@
 		79F68515F52DE6E991524427 /* CoreoButtonStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = BED2760714AD7D1641791886 /* CoreoButtonStyle.swift */; };
 		871B39EA4B8AC4BBB4A8D07D /* AudioSyncEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 601AFF2220AF62F912731742 /* AudioSyncEngine.swift */; };
 		8A64B0C33D0259F54852A629 /* AnnotationCompositor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68D54D077EAC1686114A6DAF /* AnnotationCompositor.swift */; };
+		8D3278A333338F724ED712B3 /* TimeMapperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A89F0A47A1720B4CBB0E639D /* TimeMapperTests.swift */; };
 		92BA69E569DF6E031021035D /* AnnotationModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BED948F29AE6FF994F0B4A3A /* AnnotationModel.swift */; };
 		9554A3BA9356CA081B450B95 /* AudioExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 075B7749F6E89720F392BF19 /* AudioExtractor.swift */; };
 		99DC36ED891777F069FF83EF /* ShareSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17B8CFC4DEB21BBD5B041638 /* ShareSheetView.swift */; };
+		9AD6A7E75B59E8C97A47E5AB /* ExportPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6380205E5DE7FB1904B715B3 /* ExportPlan.swift */; };
 		9CC23C6B3A3686085BF2BD34 /* AnnotationMarkerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 204A2916A871BFC20003B3EF /* AnnotationMarkerView.swift */; };
 		AB020E78BA55C8521E0A7E9A /* PlaybackControlsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E561E3BA7FCBE22CA60373D /* PlaybackControlsView.swift */; };
 		BE179B6B66A6B234E0D08E4D /* AnnotationTimeRangeControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10B7A50CD67FB317E0A368EA /* AnnotationTimeRangeControl.swift */; };
@@ -54,6 +56,7 @@
 		EADC0E5B6F7BF45FC645B91F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5E609BDF77C845CC2119D43C /* Assets.xcassets */; };
 		EC6F5291BDABF6659EE091F8 /* SpeedSegmentModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF2297AFDA5A1FE3BE0FD3C8 /* SpeedSegmentModel.swift */; };
 		F228C47A79A6A07C5778E9E0 /* ModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A301A071F44CBD5AEC1FD92 /* ModelTests.swift */; };
+		F5C7CEAB82B6C78CFCC61E95 /* ExportPlanTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3441C765B2B441458DBF388E /* ExportPlanTests.swift */; };
 		FB37156109108E08EEFA14AF /* EndBumperGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E31A7AA8C8E9D9C6DEBEE12 /* EndBumperGenerator.swift */; };
 		FCE787A0141B8C47CF09B3DF /* ExportProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CABA3689CE1CD52ADA89951 /* ExportProgressView.swift */; };
 /* End PBXBuildFile section */
@@ -79,17 +82,17 @@
 		223469245EACB17245F7C142 /* AudioSyncTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioSyncTests.swift; sourceTree = "<group>"; };
 		2E561E3BA7FCBE22CA60373D /* PlaybackControlsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackControlsView.swift; sourceTree = "<group>"; };
 		2E9CB7C84D4318E8BDDE7415 /* CoreoTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = CoreoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		4A82D1B8AB8F4E8D9BE84F21 /* ExportPlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportPlan.swift; sourceTree = "<group>"; };
-		524202D1ED4345FE4213C721 /* Coreo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Coreo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		3441C765B2B441458DBF388E /* ExportPlanTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportPlanTests.swift; sourceTree = "<group>"; };
+		524202D1ED4345FE4213C721 /* Coreo.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Coreo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		58CB611F8B2FB596771CBDD3 /* AnnotationModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationModelTests.swift; sourceTree = "<group>"; };
 		5AD1ADC5FF63295B2FCD6D6E /* VideoAsset.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoAsset.swift; sourceTree = "<group>"; };
 		5C2A18427C7F0F179AC064EC /* VideoPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoPanelView.swift; sourceTree = "<group>"; };
 		5E609BDF77C845CC2119D43C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		601AFF2220AF62F912731742 /* AudioSyncEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioSyncEngine.swift; sourceTree = "<group>"; };
+		6380205E5DE7FB1904B715B3 /* ExportPlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportPlan.swift; sourceTree = "<group>"; };
 		67B4833D4AEB1C54181B78FC /* ImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportView.swift; sourceTree = "<group>"; };
 		68D54D077EAC1686114A6DAF /* AnnotationCompositor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationCompositor.swift; sourceTree = "<group>"; };
 		77156C7733C0AB696540D574 /* CoreoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreoApp.swift; sourceTree = "<group>"; };
-		7C6E07C44731422080C47A69 /* ExportPlanTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportPlanTests.swift; sourceTree = "<group>"; };
 		78F1A7D9A2CAB2FD38866CB5 /* TimeFormatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeFormatting.swift; sourceTree = "<group>"; };
 		836D9C50D78CB209852F60F1 /* LayoutEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayoutEngineTests.swift; sourceTree = "<group>"; };
 		848F2882E6ABE131985BA616 /* SpeedControlView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedControlView.swift; sourceTree = "<group>"; };
@@ -97,10 +100,13 @@
 		8A301A071F44CBD5AEC1FD92 /* ModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelTests.swift; sourceTree = "<group>"; };
 		8CABA3689CE1CD52ADA89951 /* ExportProgressView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportProgressView.swift; sourceTree = "<group>"; };
 		90718819F8E6772FBCEE7DF7 /* TextAnnotationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextAnnotationView.swift; sourceTree = "<group>"; };
+		967070AE92BF269CB742DE76 /* TimeMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeMapper.swift; sourceTree = "<group>"; };
 		96B4D40807A1C61DCC01B373 /* CoreoProject.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreoProject.swift; sourceTree = "<group>"; };
 		9AF6BB6BEEE6C897FF2FCE9F /* LayoutEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayoutEngine.swift; sourceTree = "<group>"; };
 		9E31A7AA8C8E9D9C6DEBEE12 /* EndBumperGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EndBumperGenerator.swift; sourceTree = "<group>"; };
+		9FAFFD4521E9245038C8190E /* ProjectStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectStore.swift; sourceTree = "<group>"; };
 		A27504774982A729418B34BE /* ArrowAnnotationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArrowAnnotationView.swift; sourceTree = "<group>"; };
+		A89F0A47A1720B4CBB0E639D /* TimeMapperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeMapperTests.swift; sourceTree = "<group>"; };
 		A9DD7A94D95FD0BE852551F1 /* FFTHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFTHelper.swift; sourceTree = "<group>"; };
 		B13FCA690B97E07BFB0CB2FF /* WorkspaceViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceViewModel.swift; sourceTree = "<group>"; };
 		B346BE9DE416E5A470DED9AA /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -265,6 +271,8 @@
 			children = (
 				96B4D40807A1C61DCC01B373 /* CoreoProject.swift */,
 				9AF6BB6BEEE6C897FF2FCE9F /* LayoutEngine.swift */,
+				9FAFFD4521E9245038C8190E /* ProjectStore.swift */,
+				967070AE92BF269CB742DE76 /* TimeMapper.swift */,
 				5AD1ADC5FF63295B2FCD6D6E /* VideoAsset.swift */,
 			);
 			path = Models;
@@ -285,10 +293,11 @@
 			children = (
 				58CB611F8B2FB596771CBDD3 /* AnnotationModelTests.swift */,
 				223469245EACB17245F7C142 /* AudioSyncTests.swift */,
-				7C6E07C44731422080C47A69 /* ExportPlanTests.swift */,
+				3441C765B2B441458DBF388E /* ExportPlanTests.swift */,
 				836D9C50D78CB209852F60F1 /* LayoutEngineTests.swift */,
 				8A301A071F44CBD5AEC1FD92 /* ModelTests.swift */,
 				D7427923A6B67371B8FC970A /* TimeFormattingTests.swift */,
+				A89F0A47A1720B4CBB0E639D /* TimeMapperTests.swift */,
 			);
 			path = UnitTests;
 			sourceTree = "<group>";
@@ -299,7 +308,7 @@
 				68D54D077EAC1686114A6DAF /* AnnotationCompositor.swift */,
 				9E31A7AA8C8E9D9C6DEBEE12 /* EndBumperGenerator.swift */,
 				E2412335955689EC824A5176 /* ExportEngine.swift */,
-				4A82D1B8AB8F4E8D9BE84F21 /* ExportPlan.swift */,
+				6380205E5DE7FB1904B715B3 /* ExportPlan.swift */,
 				8CABA3689CE1CD52ADA89951 /* ExportProgressView.swift */,
 				B40B7EB935411EB76E3A8C90 /* ExportSettings.swift */,
 				10B0ABA82CFA9C92B7C83779 /* PanelCompositor.swift */,
@@ -355,6 +364,8 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+				};
 			};
 			buildConfigurationList = CC4A95969A907214FB8B9A8D /* Build configuration list for PBXProject "Coreo" */;
 			developmentRegion = en;
@@ -394,10 +405,11 @@
 			files = (
 				295731025BB8BE4D3513B326 /* AnnotationModelTests.swift in Sources */,
 				5A9F5E4493A2C56430611A18 /* AudioSyncTests.swift in Sources */,
-				43D81A81F7E44D40A7B0BB2A /* ExportPlanTests.swift in Sources */,
+				F5C7CEAB82B6C78CFCC61E95 /* ExportPlanTests.swift in Sources */,
 				D185F932C17DCB61BE7A80E0 /* LayoutEngineTests.swift in Sources */,
 				F228C47A79A6A07C5778E9E0 /* ModelTests.swift in Sources */,
 				DED036A789007E2738FCA0FC /* TimeFormattingTests.swift in Sources */,
+				8D3278A333338F724ED712B3 /* TimeMapperTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -422,7 +434,7 @@
 				E1BAC1695127FD33A1EFAFEE /* DocumentPickerView.swift in Sources */,
 				FB37156109108E08EEFA14AF /* EndBumperGenerator.swift in Sources */,
 				394681F90A3007CEC4CE75EB /* ExportEngine.swift in Sources */,
-				17D4C1E8A9B0455AB5E8D3F2 /* ExportPlan.swift in Sources */,
+				9AD6A7E75B59E8C97A47E5AB /* ExportPlan.swift in Sources */,
 				FCE787A0141B8C47CF09B3DF /* ExportProgressView.swift in Sources */,
 				168515ECCA30A987484393C2 /* ExportSettings.swift in Sources */,
 				540A2FB954CC4338A7A3F735 /* FFTHelper.swift in Sources */,
@@ -434,12 +446,14 @@
 				C9A8E136D4252B14D2D9BF48 /* PanelCompositor.swift in Sources */,
 				025333983E82CCB388C07593 /* PersonDetector.swift in Sources */,
 				AB020E78BA55C8521E0A7E9A /* PlaybackControlsView.swift in Sources */,
+				408168F1F5086F5662BABB79 /* ProjectStore.swift in Sources */,
 				99DC36ED891777F069FF83EF /* ShareSheetView.swift in Sources */,
 				57FF4F413AAC4D2EA45A2221 /* SmartCropEngine.swift in Sources */,
 				18598DB64C3F3AAFF0D0AAC8 /* SpeedControlView.swift in Sources */,
 				EC6F5291BDABF6659EE091F8 /* SpeedSegmentModel.swift in Sources */,
 				04B933A9922BB74821C2EC9A /* TextAnnotationView.swift in Sources */,
 				3E9FD381B8ADA32A73C2FD56 /* TimeFormatting.swift in Sources */,
+				0D9190ED50440ABA002B1D11 /* TimeMapper.swift in Sources */,
 				5BB621D71435C829F4CD4410 /* TimelineView.swift in Sources */,
 				BFF5EFB5A279DEF1D9A6CC42 /* VideoAsset.swift in Sources */,
 				0EAE865536F349288705D643 /* VideoGridView.swift in Sources */,
@@ -524,7 +538,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MARKETING_VERSION = 1.0.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
@@ -590,7 +604,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MARKETING_VERSION = 1.0.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -625,7 +639,6 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = 38F8VX37HB;
 				INFOPLIST_KEY_CFBundleDisplayName = Coreo;
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Coreo needs permission to save exported videos to your photo library.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Coreo needs access to your photo library to import dance videos.";
@@ -647,7 +660,6 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = 38F8VX37HB;
 				INFOPLIST_KEY_CFBundleDisplayName = Coreo;
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Coreo needs permission to save exported videos to your photo library.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Coreo needs access to your photo library to import dance videos.";

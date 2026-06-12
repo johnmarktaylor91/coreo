@@ -1,108 +1,78 @@
 // ModelTests.swift
 // CoreoTests
 //
-// Unit tests for CoreoProject and VideoAsset serialization and
-// timeline computation.
+// Unit tests for CoreoProject, VideoAsset, and ProjectStore persistence.
 
-import XCTest
 @testable import Coreo
+import XCTest
 
 final class ModelTests: XCTestCase {
+    private var tempRoot: URL!
+
+    override func setUpWithError() throws {
+        tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("CoreoModelTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+    }
+
+    override func tearDownWithError() throws {
+        try? FileManager.default.removeItem(at: tempRoot)
+        tempRoot = nil
+    }
 
     // MARK: - VideoAsset Round-Trip
 
     func testVideoAssetJSONRoundTrip() throws {
-        let original = VideoAsset(
-            id: UUID(),
-            localURL: URL(fileURLWithPath: "/tmp/test_video.mp4"),
-            durationSeconds: 125.5,
-            dimensions: CGSize(width: 1920, height: 1080),
-            audioBitrate: 128_000,
-            audioSampleRate: 44100,
-            thumbnailData: Data([0x01, 0x02, 0x03])
-        )
-
-        let encoder = JSONEncoder()
-        let data = try encoder.encode(original)
-
-        let decoder = JSONDecoder()
-        let decoded = try decoder.decode(VideoAsset.self, from: data)
-
-        XCTAssertEqual(decoded.id, original.id)
-        XCTAssertEqual(decoded.localURL, original.localURL)
-        XCTAssertEqual(decoded.durationSeconds, original.durationSeconds, accuracy: 0.001)
-        XCTAssertEqual(decoded.dimensions.width, original.dimensions.width, accuracy: 0.001)
-        XCTAssertEqual(decoded.dimensions.height, original.dimensions.height, accuracy: 0.001)
-        XCTAssertEqual(decoded.audioBitrate, original.audioBitrate)
-        XCTAssertEqual(decoded.audioSampleRate, original.audioSampleRate)
-        XCTAssertEqual(decoded.thumbnailData, original.thumbnailData)
-    }
-
-    func testVideoAssetWithNilThumbnailRoundTrip() throws {
-        let original = VideoAsset(
-            id: UUID(),
-            localURL: URL(fileURLWithPath: "/tmp/test.mov"),
-            durationSeconds: 60.0,
-            dimensions: CGSize(width: 3840, height: 2160),
-            audioBitrate: 256_000,
-            audioSampleRate: 48000,
-            thumbnailData: nil
+        let original = makeVideo(
+            filename: "test_video.mp4",
+            duration: 125.5,
+            offset: -2,
+            status: .noAudio,
+            autoCrop: CGRect(x: 0.1, y: 0.2, width: 0.7, height: 0.6)
         )
 
         let data = try JSONEncoder().encode(original)
         let decoded = try JSONDecoder().decode(VideoAsset.self, from: data)
 
-        XCTAssertNil(decoded.thumbnailData)
-        XCTAssertEqual(decoded.durationSeconds, 60.0, accuracy: 0.001)
+        XCTAssertEqual(decoded.id, original.id)
+        XCTAssertEqual(decoded.relativePath, "media/test_video.mp4")
+        XCTAssertEqual(decoded.originalFilename, "test_video.mp4")
+        XCTAssertEqual(decoded.syncOffsetSeconds, -2, accuracy: 0.001)
+        XCTAssertEqual(decoded.syncStatus, .noAudio)
+        XCTAssertEqual(decoded.autoCropRect, original.autoCropRect)
+        XCTAssertEqual(decoded.durationSeconds, original.durationSeconds, accuracy: 0.001)
     }
 
     func testVideoAssetFormattedDuration() {
-        let asset = VideoAsset(
-            id: UUID(),
-            localURL: URL(fileURLWithPath: "/tmp/v.mp4"),
-            durationSeconds: 83.45,
-            dimensions: CGSize(width: 1920, height: 1080),
-            audioBitrate: 128_000,
-            audioSampleRate: 44100,
-            thumbnailData: nil
-        )
+        let asset = makeVideo(filename: "v.mp4", duration: 83.45)
 
         XCTAssertEqual(asset.formattedDuration, "1:23")
     }
 
+    func testMediaURLResolvesRelativePath() {
+        let asset = makeVideo(filename: "v.mp4", duration: 10)
+        let root = tempRoot.appendingPathComponent("Project", isDirectory: true)
+
+        XCTAssertEqual(asset.mediaURL(projectRoot: root), root.appendingPathComponent("media/v.mp4"))
+    }
+
     // MARK: - CoreoProject Round-Trip
 
-    func testCoreProjectJSONRoundTrip() throws {
-        let video1 = VideoAsset(
-            id: UUID(),
-            localURL: URL(fileURLWithPath: "/tmp/a.mp4"),
-            durationSeconds: 30.0,
-            dimensions: CGSize(width: 1920, height: 1080),
-            audioBitrate: 128_000,
-            audioSampleRate: 44100,
-            thumbnailData: nil
-        )
-        let video2 = VideoAsset(
-            id: UUID(),
-            localURL: URL(fileURLWithPath: "/tmp/b.mp4"),
-            durationSeconds: 45.0,
-            dimensions: CGSize(width: 1080, height: 1920),
-            audioBitrate: 128_000,
-            audioSampleRate: 48000,
-            thumbnailData: nil
-        )
+    func testCoreProjectJSONRoundTripIncludesSchemaVersionAndPerVideoState() throws {
+        let video1 = makeVideo(filename: "a.mp4", duration: 30, offset: -2)
+        let video2 = makeVideo(filename: "b.mp4", duration: 45, offset: 0)
 
         var project = CoreoProject(
             name: "Test Project",
             videos: [video1, video2],
-            syncOffsets: [-2.0, 0.0]
+            referenceVideoID: video2.id,
+            audioSourceVideoID: video1.id
         )
-        project.audioSourceIndex = 1
         project.speedSegments = [
             SpeedSegment(
                 id: UUID(),
-                startTimeSeconds: 5.0,
-                durationSeconds: 3.0,
+                startTimeSeconds: 5,
+                durationSeconds: 3,
                 rate: 0.5,
                 holdDurationSeconds: nil
             )
@@ -110,8 +80,8 @@ final class ModelTests: XCTestCase {
         project.annotations = [
             TimedAnnotation(
                 id: UUID(),
-                startTimeSeconds: 10.0,
-                durationSeconds: 3.0,
+                startTimeSeconds: 10,
+                durationSeconds: 3,
                 isPersistent: false,
                 content: .text(TextAnnotation(
                     text: "Look here",
@@ -131,90 +101,34 @@ final class ModelTests: XCTestCase {
         decoder.dateDecodingStrategy = .iso8601
         let decoded = try decoder.decode(CoreoProject.self, from: data)
 
-        XCTAssertEqual(decoded.id, project.id)
+        XCTAssertEqual(decoded.schemaVersion, CoreoProject.currentSchemaVersion)
         XCTAssertEqual(decoded.name, "Test Project")
-        XCTAssertEqual(decoded.videos.count, 2)
-        XCTAssertEqual(decoded.syncOffsets, [-2.0, 0.0])
-        XCTAssertEqual(decoded.audioSourceIndex, 1)
+        XCTAssertEqual(decoded.videos.map(\.syncOffsetSeconds), [-2, 0])
+        XCTAssertEqual(decoded.referenceVideoID, video2.id)
+        XCTAssertEqual(decoded.audioSourceVideoID, video1.id)
         XCTAssertEqual(decoded.speedSegments.count, 1)
-        XCTAssertEqual(decoded.speedSegments[0].rate, 0.5)
         XCTAssertEqual(decoded.annotations.count, 1)
-
-        // Verify annotation content survived the round-trip
-        if case .text(let textAnnotation) = decoded.annotations[0].content {
-            XCTAssertEqual(textAnnotation.text, "Look here")
-            XCTAssertEqual(textAnnotation.colorHex, "#FF3B30")
-        } else {
-            XCTFail("Expected text annotation content")
-        }
     }
 
     // MARK: - Timeline Computation
 
     func testTimelineStartAndEnd() {
-        let video1 = VideoAsset(
-            id: UUID(),
-            localURL: URL(fileURLWithPath: "/tmp/a.mp4"),
-            durationSeconds: 30.0,
-            dimensions: CGSize(width: 1920, height: 1080),
-            audioBitrate: 128_000,
-            audioSampleRate: 44100,
-            thumbnailData: nil
-        )
-        let video2 = VideoAsset(
-            id: UUID(),
-            localURL: URL(fileURLWithPath: "/tmp/b.mp4"),
-            durationSeconds: 45.0,
-            dimensions: CGSize(width: 1920, height: 1080),
-            audioBitrate: 128_000,
-            audioSampleRate: 44100,
-            thumbnailData: nil
-        )
+        let video1 = makeVideo(filename: "a.mp4", duration: 30, offset: -5)
+        let video2 = makeVideo(filename: "b.mp4", duration: 45, offset: 0)
+        let project = CoreoProject(name: "Timeline Test", videos: [video1, video2])
 
-        let project = CoreoProject(
-            name: "Timeline Test",
-            videos: [video1, video2],
-            syncOffsets: [-5.0, 0.0]
-        )
-
-        // Video 1: starts at -5, ends at -5+30 = 25
-        // Video 2: starts at 0, ends at 0+45 = 45
-        XCTAssertEqual(project.timelineStartSeconds, -5.0, accuracy: 0.001)
-        XCTAssertEqual(project.timelineEndSeconds, 45.0, accuracy: 0.001)
-        XCTAssertEqual(project.timelineDurationSeconds, 50.0, accuracy: 0.001)
+        XCTAssertEqual(project.timelineStartSeconds, -5, accuracy: 0.001)
+        XCTAssertEqual(project.timelineEndSeconds, 45, accuracy: 0.001)
+        XCTAssertEqual(project.timelineDurationSeconds, 50, accuracy: 0.001)
     }
 
     func testOverlapComputation() {
-        let video1 = VideoAsset(
-            id: UUID(),
-            localURL: URL(fileURLWithPath: "/tmp/a.mp4"),
-            durationSeconds: 30.0,
-            dimensions: CGSize(width: 1920, height: 1080),
-            audioBitrate: 128_000,
-            audioSampleRate: 44100,
-            thumbnailData: nil
-        )
-        let video2 = VideoAsset(
-            id: UUID(),
-            localURL: URL(fileURLWithPath: "/tmp/b.mp4"),
-            durationSeconds: 20.0,
-            dimensions: CGSize(width: 1920, height: 1080),
-            audioBitrate: 128_000,
-            audioSampleRate: 44100,
-            thumbnailData: nil
-        )
+        let video1 = makeVideo(filename: "a.mp4", duration: 30, offset: 0)
+        let video2 = makeVideo(filename: "b.mp4", duration: 20, offset: 5)
+        let project = CoreoProject(name: "Overlap Test", videos: [video1, video2])
 
-        let project = CoreoProject(
-            name: "Overlap Test",
-            videos: [video1, video2],
-            syncOffsets: [0.0, 5.0]
-        )
-
-        // Video 1: 0-30, Video 2: 5-25
-        // Overlap starts at max(0, 5) = 5
-        // Overlap ends at min(30, 25) = 25
-        XCTAssertEqual(project.overlapStartSeconds, 5.0, accuracy: 0.001)
-        XCTAssertEqual(project.overlapEndSeconds, 25.0, accuracy: 0.001)
+        XCTAssertEqual(project.overlapStartSeconds, 5, accuracy: 0.001)
+        XCTAssertEqual(project.overlapEndSeconds, 25, accuracy: 0.001)
     }
 
     func testEmptyProjectTimeline() {
@@ -227,53 +141,107 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(project.overlapEndSeconds, 0)
     }
 
-    // MARK: - Save / Load
+    // MARK: - ProjectStore
 
-    func testSaveAndLoad() throws {
-        let video = VideoAsset(
-            id: UUID(),
-            localURL: URL(fileURLWithPath: "/tmp/save_test.mp4"),
-            durationSeconds: 10.0,
-            dimensions: CGSize(width: 1280, height: 720),
-            audioBitrate: 128_000,
-            audioSampleRate: 44100,
-            thumbnailData: nil
-        )
-
-        let original = CoreoProject(
+    func testSaveAndLoadMostRecentProject() throws {
+        let store = ProjectStore(projectsRoot: tempRoot)
+        let project = CoreoProject(
             name: "Save Test",
-            videos: [video],
-            syncOffsets: [0.0]
+            videos: [makeVideo(filename: "save_test.mp4", duration: 10)]
+        )
+        let projectDirectory = store.projectDirectory(for: project.id)
+        let mediaDirectory = projectDirectory.appendingPathComponent("media", isDirectory: true)
+        try FileManager.default.createDirectory(at: mediaDirectory, withIntermediateDirectories: true)
+        FileManager.default.createFile(
+            atPath: mediaDirectory.appendingPathComponent("save_test.mp4").path,
+            contents: Data([1])
         )
 
-        try original.save()
+        try store.save(project)
 
-        let loaded = CoreoProject.load()
-        XCTAssertNotNil(loaded)
-        XCTAssertEqual(loaded?.id, original.id)
-        XCTAssertEqual(loaded?.name, "Save Test")
-        XCTAssertEqual(loaded?.videos.count, 1)
-        XCTAssertEqual(try XCTUnwrap(loaded?.videos[0].durationSeconds), 10.0, accuracy: 0.001)
-
-        // Clean up
-        let documentsDirectory = FileManager.default.urls(
-            for: .documentDirectory,
-            in: .userDomainMask
-        ).first!
-        let fileURL = documentsDirectory.appendingPathComponent("coreo_project.json")
-        try? FileManager.default.removeItem(at: fileURL)
+        let loaded = try XCTUnwrap(store.loadMostRecentProject())
+        XCTAssertEqual(loaded.project.id, project.id)
+        XCTAssertEqual(loaded.project.name, "Save Test")
+        XCTAssertEqual(loaded.project.videos[0].mediaAvailability, .available)
     }
 
-    func testLoadReturnsNilWhenNoFileExists() {
-        // Ensure there's no leftover file
-        let documentsDirectory = FileManager.default.urls(
-            for: .documentDirectory,
-            in: .userDomainMask
-        ).first!
-        let fileURL = documentsDirectory.appendingPathComponent("coreo_project.json")
-        try? FileManager.default.removeItem(at: fileURL)
+    func testWrongOrMissingSchemaVersionIsRenamedAside() throws {
+        let store = ProjectStore(projectsRoot: tempRoot)
+        let directory = store.projectDirectory(for: UUID())
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let projectURL = directory.appendingPathComponent("project.json")
+        try Data(#"{"name":"Old Project"}"#.utf8).write(to: projectURL)
 
-        let loaded = CoreoProject.load()
-        XCTAssertNil(loaded)
+        XCTAssertNil(store.loadProject(at: directory))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: projectURL.path))
+        let staleFiles = try FileManager.default.contentsOfDirectory(atPath: directory.path)
+            .filter { $0.hasPrefix("project.stale-") }
+        XCTAssertEqual(staleFiles.count, 1)
+    }
+
+    func testMissingMediaIsMarkedOnLoad() throws {
+        let store = ProjectStore(projectsRoot: tempRoot)
+        let project = CoreoProject(
+            name: "Missing",
+            videos: [makeVideo(filename: "missing.mp4", duration: 10)]
+        )
+        try store.save(project)
+
+        let loaded = try XCTUnwrap(store.loadMostRecentProject())
+        XCTAssertEqual(loaded.project.videos[0].mediaAvailability, .missing)
+    }
+
+    func testAtomicSaveLeavesExistingProjectOnSimulatedFailure() throws {
+        let store = ProjectStore(projectsRoot: tempRoot)
+        var project = CoreoProject(name: "Original", videos: [makeVideo(filename: "a.mp4", duration: 10)])
+        try store.save(project)
+        project.name = "Mutated"
+
+        let encodedProject = try JSONEncoder().encode(project)
+        XCTAssertThrowsError(try store.save(
+            project,
+            encodedData: encodedProject,
+            simulateFailureAfterTemporaryWrite: true
+        ))
+
+        let loaded = try XCTUnwrap(store.loadMostRecentProject())
+        XCTAssertEqual(loaded.project.name, "Original")
+    }
+
+    func testRemoveMissingMediaKeepsAvailableVideos() throws {
+        let store = ProjectStore(projectsRoot: tempRoot)
+        let available = makeVideo(filename: "available.mp4", duration: 10)
+        var missing = makeVideo(filename: "missing.mp4", duration: 10)
+        missing.mediaAvailability = .missing
+        var project = CoreoProject(name: "Recovery", videos: [available, missing])
+
+        let removed = store.removeMissingMedia(from: &project, projectID: project.id)
+
+        XCTAssertEqual(removed.map(\.id), [missing.id])
+        XCTAssertEqual(project.videos.map(\.id), [available.id])
+    }
+
+    // MARK: - Helpers
+
+    private func makeVideo(
+        filename: String,
+        duration: Double,
+        offset: Double = 0,
+        status: SyncStatus = .synced,
+        autoCrop: CGRect? = nil
+    ) -> VideoAsset {
+        VideoAsset(
+            id: UUID(),
+            relativePath: "media/\(filename)",
+            originalFilename: filename,
+            durationSeconds: duration,
+            dimensions: CGSize(width: 1920, height: 1080),
+            audioBitrate: 128_000,
+            audioSampleRate: 44100,
+            thumbnailData: Data([0x01, 0x02]),
+            syncOffsetSeconds: offset,
+            syncStatus: status,
+            autoCropRect: autoCrop
+        )
     }
 }

@@ -13,6 +13,15 @@ import SwiftUI
 struct ImportView: View {
     @StateObject private var viewModel = ImportViewModel()
 
+    /// Most recently saved project offered for restore.
+    var lastProject: LoadedProject?
+
+    /// Called when the user chooses to continue a saved project.
+    var onContinueProject: (CoreoProject) -> Void
+
+    /// Called when the user discards the saved project and starts fresh.
+    var onStartNew: () -> Void
+
     /// Called when sync completes successfully with a ready-to-use project.
     var onSyncComplete: (CoreoProject) -> Void
 
@@ -32,6 +41,9 @@ struct ImportView: View {
             backgroundColor.ignoresSafeArea()
 
             VStack(spacing: 0) {
+                if let lastProject {
+                    continueProjectPanel(lastProject.project)
+                }
                 if viewModel.videos.isEmpty {
                     emptyState
                 } else {
@@ -96,6 +108,41 @@ struct ImportView: View {
     }
 
     // MARK: - Empty State
+
+    /// Simple restore choice for the last saved project.
+    private func continueProjectPanel(_ project: CoreoProject) -> some View {
+        VStack(spacing: 10) {
+            Text("Continue \(project.name)?")
+                .font(.subheadline.weight(.semibold))
+                .foregroundColor(.white)
+
+            HStack(spacing: 12) {
+                Button("Continue") {
+                    onContinueProject(project)
+                }
+                .font(.caption.weight(.semibold))
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 36)
+                .background(accentCoral)
+                .cornerRadius(8)
+
+                Button("Start New") {
+                    onStartNew()
+                }
+                .font(.caption.weight(.semibold))
+                .foregroundColor(.white.opacity(0.8))
+                .frame(maxWidth: .infinity)
+                .frame(height: 36)
+                .background(Color.white.opacity(0.08))
+                .cornerRadius(8)
+            }
+        }
+        .padding(12)
+        .background(Color(red: 0.1, green: 0.1, blue: 0.1))
+        .padding(.horizontal, 24)
+        .padding(.top, 12)
+    }
 
     /// Shown when no videos have been imported yet.
     private var emptyState: some View {

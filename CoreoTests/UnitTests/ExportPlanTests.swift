@@ -12,7 +12,7 @@ final class ExportPlanTests: XCTestCase {
 
         let plan = try ExportPlan(
             project: project,
-            sources: makeSources(count: 2, hasAudio: [true, true]),
+            sources: makeSources(count: 2, hasAudio: [true, true], offsets: [1, -1]),
             renderSize: CGSize(width: 1920, height: 1080)
         )
 
@@ -68,7 +68,7 @@ final class ExportPlanTests: XCTestCase {
 
     func testAudioFallsBackFromReferenceToFirstAvailableAngle() throws {
         var project = makeProject(count: 3, offsets: [0, 0, 0])
-        project.referenceVideoIndex = 1
+        project.referenceVideoID = project.videos[1].id
 
         let plan = try ExportPlan(
             project: project,
@@ -79,14 +79,19 @@ final class ExportPlanTests: XCTestCase {
         XCTAssertEqual(plan.audioSourceIndex, 0)
     }
 
-    func testOffsetMismatchThrowsInsteadOfZeroingOffsets() {
-        let project = makeProject(count: 3, offsets: [0, 0])
+    func testStableVideoStateProvidesCropAndOffsets() throws {
+        var project = makeProject(count: 2, offsets: [1, -1])
+        project.videos[1].manualCropRect = CGRect(x: 0.1, y: 0.1, width: 0.8, height: 0.8)
 
-        XCTAssertThrowsError(try ExportPlan(
+        let plan = try ExportPlan(
             project: project,
-            sources: makeSources(count: 3, hasAudio: [true, true, true]),
+            sources: makeSources(count: 2, hasAudio: [true, true]),
             renderSize: CGSize(width: 1920, height: 1080)
-        ))
+        )
+
+        XCTAssertEqual(plan.clipInserts[0].insertTime.seconds, 2, accuracy: 0.001)
+        XCTAssertEqual(plan.clipInserts[1].insertTime.seconds, 0, accuracy: 0.001)
+        XCTAssertEqual(plan.panels[1].cropRect, project.videos[1].manualCropRect)
     }
 
     func testFPSChoiceUsesSourceMaximumCappedAtSixty() {
@@ -116,27 +121,47 @@ final class ExportPlanTests: XCTestCase {
         let videos = (0 ..< count).map { index in
             VideoAsset(
                 id: UUID(),
-                localURL: URL(fileURLWithPath: "/tmp/video-\(index).mov"),
+                relativePath: "media/video-\(index).mov",
+                originalFilename: "video-\(index).mov",
                 durationSeconds: 10,
                 dimensions: CGSize(width: 1920, height: 1080),
                 audioBitrate: 128_000,
                 audioSampleRate: 48000,
-                thumbnailData: nil
+                thumbnailData: nil,
+                syncOffsetSeconds: index < offsets.count ? offsets[index] : 0
             )
         }
-        return CoreoProject(videos: videos, referenceVideoIndex: 0, syncOffsets: offsets)
+        return CoreoProject(
+            videos: videos,
+            referenceVideoID: videos.first?.id,
+            audioSourceVideoID: videos.first?.id
+        )
     }
 
-    private func makeSources(count: Int, hasAudio: [Bool]) -> [ExportPlan.SourceVideo] {
+    private func makeSources(
+        count: Int,
+        hasAudio: [Bool],
+        offsets: [TimeInterval]? = nil
+    ) -> [ExportPlan.SourceVideo] {
         (0 ..< count).map { index in
-            makeSource(index: index, fps: 30, hasAudio: hasAudio[index])
+            makeSource(
+                index: index,
+                fps: 30,
+                hasAudio: hasAudio[index],
+                offset: offsets?[index] ?? 0
+            )
         }
     }
 
-    private func makeSource(index: Int, fps: Float, hasAudio: Bool) -> ExportPlan.SourceVideo {
+    private func makeSource(
+        index: Int,
+        fps: Float,
+        hasAudio: Bool,
+        offset: TimeInterval = 0
+    ) -> ExportPlan.SourceVideo {
         ExportPlan.SourceVideo(
             index: index,
-            syncOffsetSeconds: 0,
+            syncOffsetSeconds: offset,
             trackTimeRange: CMTimeRange(
                 start: .zero,
                 duration: CMTime(seconds: 10, preferredTimescale: 600)
