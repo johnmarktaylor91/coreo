@@ -29,8 +29,29 @@ final class ExportCoordinator {
     /// Selected export aspect ratio.
     var exportAspectRatio: ExportAspectRatio = .landscape
 
+    /// Whether preview-mirrored panels should also be mirrored in export.
+    var mirrorFlippedPanelsInExport: Bool {
+        didSet {
+            userDefaults.set(mirrorFlippedPanelsInExport, forKey: Self.mirrorPreferenceKey)
+        }
+    }
+
     /// The active export task, kept so it can be cancelled.
     private var exportTask: Task<Void, Never>?
+
+    /// User defaults backing app-level export preferences.
+    private let userDefaults: UserDefaults
+
+    /// UserDefaults key for the export mirror preference.
+    private static let mirrorPreferenceKey = "export.mirrorFlippedPanelsInExport"
+
+    /// Creates export coordination state.
+    ///
+    /// - Parameter userDefaults: Defaults store for app-level export preferences.
+    init(userDefaults: UserDefaults = .standard) {
+        self.userDefaults = userDefaults
+        mirrorFlippedPanelsInExport = userDefaults.bool(forKey: Self.mirrorPreferenceKey)
+    }
 
     /// Export resolution based on selected aspect ratio.
     var exportResolution: CGSize {
@@ -56,6 +77,7 @@ final class ExportCoordinator {
                 let url = try await ExportEngine.export(
                     project: project,
                     resolution: resolution,
+                    mirrorFlippedPanels: self.mirrorFlippedPanelsInExport,
                     progressHandler: { [weak self] progress in
                         Task { @MainActor in
                             self?.exportProgress = progress

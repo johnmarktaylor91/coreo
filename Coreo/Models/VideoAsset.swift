@@ -220,7 +220,7 @@ struct VideoAsset: Codable, Identifiable {
     ///   - relativePath: Project-relative media path to persist.
     /// - Returns: A `VideoAsset` with duration, dimensions, audio info, and thumbnail populated.
     /// - Throws: `VideoAssetError` if required tracks are missing or thumbnail generation fails.
-    static func from(url: URL, relativePath: String) async throws -> VideoAsset {
+    static func from(url: URL, relativePath: String, id: UUID = UUID()) async throws -> VideoAsset {
         let asset = AVURLAsset(url: url)
 
         // Load duration and tracks concurrently
@@ -283,7 +283,7 @@ struct VideoAsset: Codable, Identifiable {
         }
 
         return VideoAsset(
-            id: UUID(),
+            id: id,
             relativePath: relativePath,
             originalFilename: url.lastPathComponent,
             durationSeconds: durationSeconds,
@@ -291,6 +291,33 @@ struct VideoAsset: Codable, Identifiable {
             audioBitrate: bitrate,
             audioSampleRate: sampleRate,
             thumbnailData: thumbnailData
+        )
+    }
+
+    /// Builds a recovered media asset while preserving project-attached editing state.
+    ///
+    /// - Parameter replacement: Newly imported media metadata.
+    /// - Returns: A video asset with the original identity and editing fields.
+    func replacingMedia(with replacement: VideoAsset) -> VideoAsset {
+        VideoAsset(
+            id: id,
+            relativePath: replacement.relativePath,
+            originalFilename: replacement.originalFilename,
+            durationSeconds: replacement.durationSeconds,
+            dimensions: replacement.dimensions,
+            audioBitrate: replacement.audioBitrate,
+            audioSampleRate: replacement.audioSampleRate,
+            thumbnailData: replacement.thumbnailData,
+            syncOffsetSeconds: syncOffsetSeconds,
+            syncStatus: syncStatus,
+            autoCropRect: autoCropRect,
+            manualCropRect: manualCropRect,
+            isMirrored: isMirrored,
+            panelRectOverride: panelRectOverride,
+            trimStartSeconds: trimStartSeconds,
+            trimDurationSeconds: trimDurationSeconds,
+            annotationCanvasSize: annotationCanvasSize,
+            mediaAvailability: .available
         )
     }
 }

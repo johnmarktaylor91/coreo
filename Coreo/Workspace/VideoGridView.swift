@@ -22,6 +22,8 @@ struct VideoGridView: View {
     /// Available container size passed in from the parent GeometryReader.
     let containerSize: CGSize
 
+    @State private var expandedSyncIndex: Int?
+
     var body: some View {
         let rects = viewModel.panelRects(containerSize: containerSize)
 
@@ -43,8 +45,12 @@ struct VideoGridView: View {
                         isMirrored: video.isMirrored,
                         isMuted: viewModel.isPanelMuted(index: index),
                         syncStatusLabel: viewModel.syncStatusLabel(for: index),
+                        isReference: index == viewModel.project.referenceVideoIndex,
                         onNudgeSync: { delta in
                             viewModel.nudgeSyncOffset(index: index, deltaSeconds: delta)
+                        },
+                        onExpandSync: {
+                            expandedSyncIndex = index
                         },
                         onToggleMute: {
                             viewModel.togglePanelMute(index: index)
@@ -62,7 +68,35 @@ struct VideoGridView: View {
             }
         }
         .frame(width: containerSize.width, height: containerSize.height)
+        .sheet(item: syncSheetBinding) { item in
+            WaveformSyncNudgeView(
+                viewModel: viewModel,
+                videoIndex: item.index,
+                onDone: { expandedSyncIndex = nil }
+            )
+        }
     }
+
+    private var syncSheetBinding: Binding<SyncSheetItem?> {
+        Binding(
+            get: {
+                guard let expandedSyncIndex else { return nil }
+                return SyncSheetItem(index: expandedSyncIndex)
+            },
+            set: { item in
+                expandedSyncIndex = item?.index
+            }
+        )
+    }
+}
+
+/// Sheet identity for expanded sync editing.
+private struct SyncSheetItem: Identifiable {
+    /// Video display index.
+    let index: Int
+
+    /// Stable sheet identity.
+    var id: Int { index }
 }
 
 /// Leaf panel wrapper that is allowed to read playhead state.
@@ -91,8 +125,14 @@ private struct ActiveVideoPanelView: View {
     /// Compact sync status label.
     let syncStatusLabel: String
 
+    /// Whether this panel is the sync reference.
+    let isReference: Bool
+
     /// Sync nudge callback.
     let onNudgeSync: (Double) -> Void
+
+    /// Expanded sync callback.
+    let onExpandSync: () -> Void
 
     /// Toggle panel mute callback.
     let onToggleMute: () -> Void
@@ -110,7 +150,9 @@ private struct ActiveVideoPanelView: View {
             isActive: viewModel.isVideoActive(index: index, at: currentTimeSeconds),
             inactiveLabel: viewModel.inactiveLabel(forIndex: index, at: currentTimeSeconds),
             syncStatusLabel: syncStatusLabel,
+            isReference: isReference,
             onNudgeSync: onNudgeSync,
+            onExpandSync: onExpandSync,
             onToggleMute: onToggleMute,
             onToggleMirror: onToggleMirror
         )

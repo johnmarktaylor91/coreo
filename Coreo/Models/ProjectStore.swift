@@ -134,6 +134,29 @@ struct ProjectStore {
         return try await VideoAsset.from(url: copiedURL, relativePath: relativePath)
     }
 
+    /// Copies replacement media into the project directory and preserves the existing asset ID.
+    ///
+    /// - Parameters:
+    ///   - sourceURL: Replacement video selected by the user.
+    ///   - existing: Missing asset whose identity and edits should be retained.
+    ///   - projectID: Project identity.
+    /// - Returns: Replacement asset plus copied file URL for cancellation cleanup.
+    func importReplacementVideo(
+        from sourceURL: URL,
+        replacing existing: VideoAsset,
+        projectID: UUID
+    ) async throws -> (asset: VideoAsset, copiedURL: URL) {
+        let copiedURL = try copyMedia(from: sourceURL, projectID: projectID)
+        let relativePath = "media/\(copiedURL.lastPathComponent)"
+        do {
+            let imported = try await VideoAsset.from(url: copiedURL, relativePath: relativePath)
+            return (existing.replacingMedia(with: imported), copiedURL)
+        } catch {
+            try? fileManager.removeItem(at: copiedURL)
+            throw error
+        }
+    }
+
     /// Copies source media into a project directory.
     ///
     /// - Parameters:

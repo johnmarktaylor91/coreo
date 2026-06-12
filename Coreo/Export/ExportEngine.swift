@@ -58,6 +58,7 @@ enum ExportEngine {
     static func export(
         project: CoreoProject,
         resolution: CGSize = CGSize(width: 1920, height: 1080),
+        mirrorFlippedPanels: Bool = false,
         progressHandler: @escaping @Sendable (Double) -> Void
     ) async throws -> URL {
         guard !project.videos.isEmpty else {
@@ -79,7 +80,8 @@ enum ExportEngine {
         let plan = try ExportPlan(
             project: project,
             sources: makePlanSources(project: project, sources: sources),
-            renderSize: resolution
+            renderSize: resolution,
+            mirrorFlippedPanels: mirrorFlippedPanels
         )
         guard plan.panels.count == project.videos.count else {
             throw ExportError.compositionFailed(
@@ -390,7 +392,8 @@ enum ExportEngine {
                 panelRect: panel.rect,
                 videoSize: videoSize,
                 sourceTransform: sourceTransform,
-                cropRect: panel.cropRect
+                cropRect: panel.cropRect,
+                isMirrored: panel.isMirrored
             ))
         }
 
@@ -421,7 +424,8 @@ enum ExportEngine {
                     panelRect: CGRect(origin: .zero, size: renderSize),
                     videoSize: renderSize,
                     sourceTransform: .identity,
-                    cropRect: nil
+                    cropRect: nil,
+                    isMirrored: false
                 )
                 let bumperInstruction = PanelCompositionInstruction(
                     timeRange: CMTimeRange(start: bumperStart, duration: bumperDuration),

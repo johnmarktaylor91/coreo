@@ -52,6 +52,12 @@ final class WorkspaceViewModel {
     /// Cached interactive scrub snap landmarks.
     private(set) var scrubSnapTargets: ScrubSnapTargets
 
+    /// Cached waveform envelopes keyed by video ID.
+    var waveformEnvelopes: [UUID: WaveformEnvelope] = [:]
+
+    /// Video IDs whose waveform envelope is currently loading.
+    var loadingWaveformVideoIDs: Set<UUID> = []
+
     /// The project store used for media URL resolution and autosave.
     private let projectStore: ProjectStore
 
@@ -69,6 +75,9 @@ final class WorkspaceViewModel {
 
     /// Audio interruption observation token.
     private var interruptionObserver: NSObjectProtocol?
+
+    /// Auto-sync offsets captured for reset without changing the persisted schema.
+    private var autoSyncOffsetsByVideoID: [UUID: Double]
 
     /// Whether playback was active before the app went to background.
     private var wasPlayingBeforeBackground = false
@@ -96,6 +105,15 @@ final class WorkspaceViewModel {
         project.videos.filter { $0.mediaAvailability == .missing }
     }
 
+    /// Per-missing-video recovery error text.
+    var mediaRecoveryErrorsByVideoID: [UUID: String] = [:]
+
+    /// Video IDs currently running a replacement import.
+    var repickingMediaVideoIDs: Set<UUID> = []
+
+    /// Pending replacement that requires a duration warning confirmation.
+    var pendingMediaReplacement: PendingMediaReplacement?
+
     /// Creates the workspace model and its focused controllers.
     ///
     /// - Parameters:
@@ -108,6 +126,9 @@ final class WorkspaceViewModel {
         export = ExportCoordinator()
         countIn = CountInController()
         unmutedVideoIDs = Set(project.audioSourceVideoID.map { [$0] } ?? [])
+        autoSyncOffsetsByVideoID = Dictionary(uniqueKeysWithValues: project.videos.map {
+            ($0.id, $0.syncOffsetSeconds)
+        })
         scrubSnapTargets = ScrubSnapTargets.build(
             annotations: project.annotations,
             speedSegments: project.speedSegments,
@@ -381,6 +402,57 @@ final class WorkspaceViewModel {
         }
     }
 
+    /// Replaces a missing media file with a newly picked video.
+    ///
+    /// - Parameters:
+    ///   - id: Missing video identity.
+    ///   - sourceURL: Picked replacement file.
+    func rePickMissingVideo(id: UUID, sourceURL: URL) async {
+        guard let index = project.index(forVideoID: id) else { return }
+        mediaRecoveryErrorsByVideoID[id] = nil
+        repickingMediaVideoIDs.insert(id)
+        let existing = project.videos[index]
+
+        do {
+            let replacement = try await projectStore.importReplacementVideo(
+                from: sourceURL,
+                replacing: existing,
+                projectID: project.id
+            )
+            repickingMediaVideoIDs.remove(id)
+            if MediaReplacementPolicy.requiresDurationWarning(
+                originalDuration: existing.durationSeconds,
+                replacementDuration: replacement.asset.durationSeconds
+            ) {
+                pendingMediaReplacement = PendingMediaReplacement(
+                    videoID: id,
+                    asset: replacement.asset,
+                    copiedURL: replacement.copiedURL
+                )
+            } else {
+                applyReplacement(asset: replacement.asset)
+            }
+        } catch {
+            repickingMediaVideoIDs.remove(id)
+            mediaRecoveryErrorsByVideoID[id] = error.localizedDescription
+            Haptic.error()
+        }
+    }
+
+    /// Applies the pending duration-warning replacement.
+    func usePendingMediaReplacement() {
+        guard let pending = pendingMediaReplacement else { return }
+        pendingMediaReplacement = nil
+        applyReplacement(asset: pending.asset)
+    }
+
+    /// Cancels and deletes the pending replacement copy.
+    func cancelPendingMediaReplacement() {
+        guard let pending = pendingMediaReplacement else { return }
+        pendingMediaReplacement = nil
+        try? FileManager.default.removeItem(at: pending.copiedURL)
+    }
+
     /// Whether a video has content at the given timeline position.
     ///
     /// - Parameters:
@@ -412,6 +484,57 @@ final class WorkspaceViewModel {
         playback.seekAfterProjectTimingChange()
     }
 
+    /// Sets a video's sync offset and reapplies playback planning.
+    ///
+    /// - Parameters:
+    ///   - index: Video display index.
+    ///   - offsetSeconds: New canonical sync offset.
+    func setSyncOffset(index: Int, offsetSeconds: Double) {
+        guard project.videos.indices.contains(index) else { return }
+        project.videos[index].syncOffsetSeconds = offsetSeconds
+        playback.seekAfterProjectTimingChange()
+    }
+
+    /// Resets one video to the auto-sync offset captured on workspace entry or latest re-sync.
+    ///
+    /// - Parameter index: Video display index.
+    func resetSyncOffset(index: Int) {
+        guard project.videos.indices.contains(index),
+              let offset = autoSyncOffsetsByVideoID[project.videos[index].id] else { return }
+        setSyncOffset(index: index, offsetSeconds: offset)
+    }
+
+    /// Loads and caches a waveform envelope for one video.
+    ///
+    /// - Parameter index: Video display index.
+    func loadWaveformEnvelopeIfNeeded(index: Int) {
+        guard project.videos.indices.contains(index) else { return }
+        let video = project.videos[index]
+        guard waveformEnvelopes[video.id] == nil,
+              !loadingWaveformVideoIDs.contains(video.id) else { return }
+        loadingWaveformVideoIDs.insert(video.id)
+        let url = projectStore.mediaURL(for: video, projectID: project.id)
+
+        Task {
+            do {
+                let envelope = try await WaveformEnvelopeBuilder.envelope(from: url)
+                await MainActor.run {
+                    waveformEnvelopes[video.id] = envelope
+                    loadingWaveformVideoIDs.remove(video.id)
+                }
+            } catch {
+                await MainActor.run {
+                    waveformEnvelopes[video.id] = WaveformEnvelope(
+                        buckets: [],
+                        sampleRate: WaveformEnvelopeBuilder.sampleRate,
+                        hasAudio: false
+                    )
+                    loadingWaveformVideoIDs.remove(video.id)
+                }
+            }
+        }
+    }
+
     /// Re-runs audio sync from the workspace and updates per-video offsets/status.
     func resyncProject() {
         guard !isResyncing, project.videos.count >= 2 else { return }
@@ -431,6 +554,9 @@ final class WorkspaceViewModel {
                         project.videos[result.videoIndex].syncOffsetSeconds = result.offsetSeconds
                         project.videos[result.videoIndex].syncStatus = result.status
                     }
+                    autoSyncOffsetsByVideoID = Dictionary(uniqueKeysWithValues: project.videos.map {
+                        ($0.id, $0.syncOffsetSeconds)
+                    })
                     project.referenceVideoIndex = output.referenceIndex
                     project.audioSourceIndex = output.audioSourceIndex
                     isResyncing = false
@@ -483,6 +609,21 @@ final class WorkspaceViewModel {
     }
 }
 
+/// Replacement media awaiting user confirmation.
+struct PendingMediaReplacement: Identifiable {
+    /// Video identity being replaced.
+    let videoID: UUID
+
+    /// Replacement asset preserving the original ID.
+    let asset: VideoAsset
+
+    /// Copied media URL to delete if the user cancels.
+    let copiedURL: URL
+
+    /// Stable alert identity.
+    var id: UUID { videoID }
+}
+
 // MARK: - Private Sync
 
 private extension WorkspaceViewModel {
@@ -496,6 +637,23 @@ private extension WorkspaceViewModel {
     /// Writes annotation store changes back into the project.
     func syncProjectAnnotationsFromStore() {
         project.annotations = annotations.annotations
+    }
+
+    /// Applies a recovered media asset and rebuilds player state.
+    ///
+    /// - Parameter asset: Replacement asset preserving the original ID.
+    func applyReplacement(asset: VideoAsset) {
+        guard let index = project.index(forVideoID: asset.id) else { return }
+        let wasPlaying = playback.isPlaying
+        playback.pauseIfNeeded()
+        project.videos[index] = asset
+        mediaRecoveryErrorsByVideoID[asset.id] = nil
+        playback.rebuildPlayers()
+        saveImmediately()
+        if wasPlaying {
+            playback.resumePlayback()
+        }
+        Haptic.success()
     }
 
     /// Rebuilds cached scrub snap landmarks after landmark sources change.

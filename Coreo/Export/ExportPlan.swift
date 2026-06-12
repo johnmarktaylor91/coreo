@@ -62,6 +62,8 @@ struct ExportPlan {
         let rect: CGRect
         /// Optional normalized crop rectangle.
         let cropRect: CGRect?
+        /// Whether the panel's video content is mirrored in export.
+        let isMirrored: Bool
     }
 
     /// Insert ranges for source clips.
@@ -90,8 +92,14 @@ struct ExportPlan {
     ///   - project: Project to export.
     ///   - sources: Source-track metadata in project video order.
     ///   - renderSize: Output render size in pixels.
+    ///   - mirrorFlippedPanels: Whether preview mirror state should be applied to export.
     /// - Throws: `ExportError` if project arrays are inconsistent.
-    init(project: CoreoProject, sources: [SourceVideo], renderSize: CGSize) throws {
+    init(
+        project: CoreoProject,
+        sources: [SourceVideo],
+        renderSize: CGSize,
+        mirrorFlippedPanels: Bool = false
+    ) throws {
         try Self.validateProject(project, sources: sources)
         let planSources = sources.map { source in
             SourceVideo(
@@ -117,7 +125,8 @@ struct ExportPlan {
         panels = Self.makePanels(
             project: project,
             sources: planSources,
-            renderSize: renderSize
+            renderSize: renderSize,
+            mirrorFlippedPanels: mirrorFlippedPanels
         )
         audioSourceIndex = Self.chooseAudioSource(
             referenceIndex: project.referenceVideoIndex,
@@ -299,7 +308,8 @@ struct ExportPlan {
     private static func makePanels(
         project: CoreoProject,
         sources: [SourceVideo],
-        renderSize: CGSize
+        renderSize: CGSize,
+        mirrorFlippedPanels: Bool
     ) -> [Panel] {
         let rects: [CGRect]
         let manualOverrides = project.videos.compactMap(\.panelRectOverride)
@@ -342,7 +352,8 @@ struct ExportPlan {
             return Panel(
                 index: source.index,
                 rect: rects[offset],
-                cropRect: project.videos[source.index].effectiveCropRect
+                cropRect: project.videos[source.index].effectiveCropRect,
+                isMirrored: mirrorFlippedPanels && project.videos[source.index].isMirrored
             )
         }
     }

@@ -108,6 +108,27 @@ final class ExportPlanTests: XCTestCase {
         XCTAssertEqual(plan.panels[1].cropRect, project.videos[1].manualCropRect)
     }
 
+    func testMirrorFlagPropagatesOnlyWhenExportToggleIsEnabled() throws {
+        var project = makeProject(count: 2, offsets: [0, 0])
+        project.videos[1].isMirrored = true
+
+        let disabledPlan = try ExportPlan(
+            project: project,
+            sources: makeSources(count: 2, hasAudio: [true, true]),
+            renderSize: CGSize(width: 1920, height: 1080),
+            mirrorFlippedPanels: false
+        )
+        let enabledPlan = try ExportPlan(
+            project: project,
+            sources: makeSources(count: 2, hasAudio: [true, true]),
+            renderSize: CGSize(width: 1920, height: 1080),
+            mirrorFlippedPanels: true
+        )
+
+        XCTAssertEqual(disabledPlan.panels.map(\.isMirrored), [false, false])
+        XCTAssertEqual(enabledPlan.panels.map(\.isMirrored), [false, true])
+    }
+
     func testFPSChoiceUsesSourceMaximumCappedAtSixty() {
         let sources = [
             makeSource(index: 0, fps: 24, hasAudio: true),

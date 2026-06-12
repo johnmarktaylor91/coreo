@@ -35,8 +35,14 @@ struct VideoPanelView: View {
     /// Compact sync status label.
     let syncStatusLabel: String
 
+    /// Whether this panel is the sync reference.
+    let isReference: Bool
+
     /// Called when the user nudges sync by a delta.
     let onNudgeSync: (Double) -> Void
+
+    /// Called when the user opens expanded waveform sync.
+    let onExpandSync: () -> Void
 
     /// Called when the user toggles this panel's audio.
     let onToggleMute: () -> Void
@@ -121,12 +127,34 @@ struct VideoPanelView: View {
 
     /// Small per-panel manual sync nudge controls.
     private var syncNudgeControls: some View {
-        HStack(spacing: 4) {
-            syncNudgeButton(label: "-1f", delta: -1.0 / 30.0)
-            syncNudgeButton(label: "+1f", delta: 1.0 / 30.0)
-            syncNudgeButton(label: "-.1", delta: -0.1)
-            syncNudgeButton(label: "+.1", delta: 0.1)
+        Group {
+            if !isReference {
+                HStack(spacing: 4) {
+                    syncExpandButton
+                    syncNudgeButton(label: "-1f", delta: -1.0 / 30.0)
+                    syncNudgeButton(label: "+1f", delta: 1.0 / 30.0)
+                    syncNudgeButton(label: "-.1", delta: -0.1)
+                    syncNudgeButton(label: "+.1", delta: 0.1)
+                }
+            }
         }
+    }
+
+    /// Opens the expanded waveform nudge view.
+    private var syncExpandButton: some View {
+        Button {
+            Haptic.tick()
+            onExpandSync()
+        } label: {
+            Image(systemName: "waveform")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(CoreoColor.accent)
+                .frame(width: 28, height: 24)
+                .background(Color.black.opacity(0.5))
+                .clipShape(RoundedRectangle(cornerRadius: 4))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Open waveform sync")
     }
 
     /// Mirror and audio buttons for one panel.

@@ -243,6 +243,50 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(project.videos.map(\.id), [available.id])
     }
 
+    func testReplacementDurationToleranceDecision() {
+        XCTAssertFalse(MediaReplacementPolicy.requiresDurationWarning(
+            originalDuration: 10,
+            replacementDuration: 10.25
+        ))
+        XCTAssertTrue(MediaReplacementPolicy.requiresDurationWarning(
+            originalDuration: 10,
+            replacementDuration: 10.251
+        ))
+    }
+
+    func testRepickedAssetKeepsUUIDAndOffsetsAfterSaveLoad() throws {
+        let store = ProjectStore(projectsRoot: tempRoot)
+        let originalID = UUID()
+        let original = makeVideo(filename: "missing.mp4", duration: 10, offset: 1.25, id: originalID)
+        let replacementMetadata = makeVideo(filename: "replacement.mp4", duration: 10.1, offset: -9)
+        let recovered = original.replacingMedia(with: replacementMetadata)
+        let project = CoreoProject(
+            name: "Recovered",
+            videos: [recovered],
+            referenceVideoID: recovered.id,
+            audioSourceVideoID: recovered.id
+        )
+        let mediaDirectory = store.mediaDirectory(for: project.id)
+        try FileManager.default.createDirectory(at: mediaDirectory, withIntermediateDirectories: true)
+        FileManager.default.createFile(
+            atPath: mediaDirectory.appendingPathComponent("replacement.mp4").path,
+            contents: Data([1])
+        )
+
+        try store.save(project)
+
+        let loaded = try XCTUnwrap(store.loadMostRecentProject())
+        let video = try XCTUnwrap(loaded.project.videos.first)
+        XCTAssertEqual(video.id, originalID)
+        XCTAssertEqual(video.syncOffsetSeconds, 1.25, accuracy: 0.0001)
+        XCTAssertEqual(video.relativePath, "media/replacement.mp4")
+        XCTAssertEqual(video.mediaAvailability, .available)
+        XCTAssertEqual(
+            store.mediaURL(for: video, projectID: loaded.project.id),
+            store.projectDirectory(for: loaded.project.id).appendingPathComponent("media/replacement.mp4")
+        )
+    }
+
     // MARK: - Helpers
 
     private func makeVideo(
@@ -250,10 +294,11 @@ final class ModelTests: XCTestCase {
         duration: Double,
         offset: Double = 0,
         status: SyncStatus = .synced,
-        autoCrop: CGRect? = nil
+        autoCrop: CGRect? = nil,
+        id: UUID = UUID()
     ) -> VideoAsset {
         VideoAsset(
-            id: UUID(),
+            id: id,
             relativePath: "media/\(filename)",
             originalFilename: filename,
             durationSeconds: duration,

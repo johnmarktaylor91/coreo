@@ -6,6 +6,7 @@
 // tools panel, and the unified timeline. Designed as a viewer first:
 // edit tools are discoverable but hidden by default.
 
+import PhotosUI
 import SwiftUI
 
 /// The main workspace screen. Owns the WorkspaceViewModel and composes
@@ -14,6 +15,9 @@ struct WorkspaceView: View {
     @State private var viewModel: WorkspaceViewModel
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var recoveryPhotoItems: [PhotosPickerItem] = []
+    @State private var recoveryVideoID: UUID?
+    @State private var isRecoveryPhotoPickerPresented = false
 
     /// Coral accent used for interactive elements.
     private let accentCoral = Color(red: 1.0, green: 0.42, blue: 0.21)
@@ -116,6 +120,15 @@ struct WorkspaceView: View {
                 ShareSheetView(activityItems: [url])
             }
         }
+        .photosPicker(
+            isPresented: $isRecoveryPhotoPickerPresented,
+            selection: $recoveryPhotoItems,
+            maxSelectionCount: 1,
+            matching: .videos
+        )
+        .onChange(of: recoveryPhotoItems) { _, items in
+            handleRecoveryPhotoSelection(items)
+        }
         .alert("Export Failed", isPresented: .init(
             get: { viewModel.export.exportError != nil },
             set: { if !$0 { bindableExport.exportError = nil } }
@@ -123,6 +136,18 @@ struct WorkspaceView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(viewModel.export.exportError ?? "")
+        }
+        .alert(item: pendingMediaReplacementBinding) { _ in
+            Alert(
+                title: Text("Clip Length Differs"),
+                message: Text("This clip's length differs from the original; sync may be off. Re-sync from the workspace if needed."),
+                primaryButton: .default(Text("Use Anyway")) {
+                    viewModel.usePendingMediaReplacement()
+                },
+                secondaryButton: .cancel(Text("Cancel")) {
+                    viewModel.cancelPendingMediaReplacement()
+                }
+            )
         }
     }
 
@@ -374,11 +399,29 @@ struct WorkspaceView: View {
                         .foregroundColor(.white.opacity(0.85))
                         .lineLimit(1)
                     Spacer()
+                    Button("Re-pick") {
+                        recoveryVideoID = video.id
+                        isRecoveryPhotoPickerPresented = true
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(.white)
+                    .frame(minHeight: 44)
+                    .disabled(viewModel.repickingMediaVideoIDs.contains(video.id))
                     Button("Remove") {
                         viewModel.removeMissingVideo(id: video.id)
                     }
                     .font(.caption.weight(.semibold))
                     .foregroundColor(accentCoral)
+                    .frame(minHeight: 44)
+                }
+                if viewModel.repickingMediaVideoIDs.contains(video.id) {
+                    ProgressView()
+                        .tint(accentCoral)
+                }
+                if let error = viewModel.mediaRecoveryErrorsByVideoID[video.id] {
+                    Text(error)
+                        .font(.caption2)
+                        .foregroundColor(CoreoColor.error)
                 }
             }
         }
@@ -483,6 +526,12 @@ struct WorkspaceView: View {
                     }
                 }
             }
+            if viewModel.project.videos.contains(where: \.isMirrored) {
+                Divider()
+                Toggle(isOn: $bindableExport.mirrorFlippedPanelsInExport) {
+                    Label("Mirror flipped panels in export", systemImage: "arrow.left.and.right")
+                }
+            }
         } label: {
             HStack(spacing: Spacing.xs) {
                 Image(systemName: viewModel.export.exportAspectRatio.iconName)
@@ -490,6 +539,40 @@ struct WorkspaceView: View {
             }
             .font(.caption)
             .foregroundColor(.white.opacity(0.7))
+        }
+    }
+
+    private var pendingMediaReplacementBinding: Binding<PendingMediaReplacement?> {
+        Binding(
+            get: { viewModel.pendingMediaReplacement },
+            set: { replacement in
+                viewModel.pendingMediaReplacement = replacement
+            }
+        )
+    }
+
+    /// Handles a picked replacement video for missing-media recovery.
+    ///
+    /// - Parameter items: Selected photo picker items.
+    private func handleRecoveryPhotoSelection(_ items: [PhotosPickerItem]) {
+        guard let id = recoveryVideoID, let item = items.first else {
+            recoveryPhotoItems = []
+            return
+        }
+        Task {
+            defer {
+                recoveryPhotoItems = []
+                recoveryVideoID = nil
+            }
+            do {
+                guard let movie = try await item.loadTransferable(type: VideoTransferable.self) else {
+                    throw CocoaError(.fileReadUnknown)
+                }
+                await viewModel.rePickMissingVideo(id: id, sourceURL: movie.url)
+            } catch {
+                viewModel.mediaRecoveryErrorsByVideoID[id] = error.localizedDescription
+                Haptic.error()
+            }
         }
     }
 }

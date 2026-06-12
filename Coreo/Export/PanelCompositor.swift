@@ -68,6 +68,8 @@ final class PanelCompositionInstruction: NSObject, AVVideoCompositionInstruction
         let sourceTransform: CGAffineTransform
         /// Optional normalized (0-1) user crop rect.
         let cropRect: CGRect?
+        /// Whether to mirror the video content inside this panel.
+        let isMirrored: Bool
     }
 
     let panelConfigs: [PanelConfig]
@@ -184,6 +186,17 @@ final class PanelCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
 
             let extent = image.extent
             guard extent.width > 0, extent.height > 0 else { continue }
+
+            if config.isMirrored {
+                image = image.transformed(by: CGAffineTransform(
+                    a: -1,
+                    b: 0,
+                    c: 0,
+                    d: 1,
+                    tx: extent.minX + extent.maxX,
+                    ty: 0
+                ))
+            }
 
             // Convert panel rect from screen (y-down) to CIImage (y-up).
             let ciPanel = CGRect(
