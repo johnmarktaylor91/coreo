@@ -42,7 +42,11 @@ struct VideoGridView: View {
                         player: viewModel.players[index],
                         cropRect: cropRect,
                         isActive: isActive,
-                        inactiveLabel: label
+                        inactiveLabel: label,
+                        syncStatusLabel: viewModel.syncStatusLabel(for: index),
+                        onNudgeSync: { delta in
+                            viewModel.nudgeSyncOffset(index: index, deltaSeconds: delta)
+                        }
                     )
                     .frame(width: rect.width, height: rect.height)
                     .position(

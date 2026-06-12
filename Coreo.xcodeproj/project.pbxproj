@@ -33,6 +33,7 @@
 		79D0769EBC3E5510C130EC19 /* CoreoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77156C7733C0AB696540D574 /* CoreoApp.swift */; };
 		79F68515F52DE6E991524427 /* CoreoButtonStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = BED2760714AD7D1641791886 /* CoreoButtonStyle.swift */; };
 		871B39EA4B8AC4BBB4A8D07D /* AudioSyncEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 601AFF2220AF62F912731742 /* AudioSyncEngine.swift */; };
+		8872A8A83B47B27015CC73E4 /* HoldPlaybackCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D3BF7B072CCC0B9693CFCF6 /* HoldPlaybackCoordinator.swift */; };
 		8A64B0C33D0259F54852A629 /* AnnotationCompositor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68D54D077EAC1686114A6DAF /* AnnotationCompositor.swift */; };
 		8D3278A333338F724ED712B3 /* TimeMapperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A89F0A47A1720B4CBB0E639D /* TimeMapperTests.swift */; };
 		92BA69E569DF6E031021035D /* AnnotationModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BED948F29AE6FF994F0B4A3A /* AnnotationModel.swift */; };
@@ -40,6 +41,7 @@
 		99DC36ED891777F069FF83EF /* ShareSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17B8CFC4DEB21BBD5B041638 /* ShareSheetView.swift */; };
 		9AD6A7E75B59E8C97A47E5AB /* ExportPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6380205E5DE7FB1904B715B3 /* ExportPlan.swift */; };
 		9CC23C6B3A3686085BF2BD34 /* AnnotationMarkerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 204A2916A871BFC20003B3EF /* AnnotationMarkerView.swift */; };
+		9E4EA868BB2E406C37B5F321 /* TimelineCoordinateMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C1C6D6A6341BD85A4D9923B /* TimelineCoordinateMapper.swift */; };
 		AB020E78BA55C8521E0A7E9A /* PlaybackControlsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E561E3BA7FCBE22CA60373D /* PlaybackControlsView.swift */; };
 		BE179B6B66A6B234E0D08E4D /* AnnotationTimeRangeControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10B7A50CD67FB317E0A368EA /* AnnotationTimeRangeControl.swift */; };
 		BFF5EFB5A279DEF1D9A6CC42 /* VideoAsset.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5AD1ADC5FF63295B2FCD6D6E /* VideoAsset.swift */; };
@@ -51,10 +53,12 @@
 		DED036A789007E2738FCA0FC /* TimeFormattingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7427923A6B67371B8FC970A /* TimeFormattingTests.swift */; };
 		E16F0D386AE26B5E943349D2 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B346BE9DE416E5A470DED9AA /* ContentView.swift */; };
 		E1BAC1695127FD33A1EFAFEE /* DocumentPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8584ED4DB950FB1D529DD1B2 /* DocumentPickerView.swift */; };
+		E42542171136EEB19CEBA1EA /* PlayerSyncPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97FB09D975CAE1BBC153A72C /* PlayerSyncPlan.swift */; };
 		E554588BE3161813AEF86973 /* VideoPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C2A18427C7F0F179AC064EC /* VideoPanelView.swift */; };
 		E8F36337C9E1FDCD68BCF2B2 /* WorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1A37A7EA12F7F380E3B6A0 /* WorkspaceView.swift */; };
 		EADC0E5B6F7BF45FC645B91F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5E609BDF77C845CC2119D43C /* Assets.xcassets */; };
 		EC6F5291BDABF6659EE091F8 /* SpeedSegmentModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF2297AFDA5A1FE3BE0FD3C8 /* SpeedSegmentModel.swift */; };
+		F085E7E53E38C3E89F070C03 /* PlaybackCoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47513E4279EAAB51B7A2EF2E /* PlaybackCoreTests.swift */; };
 		F228C47A79A6A07C5778E9E0 /* ModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A301A071F44CBD5AEC1FD92 /* ModelTests.swift */; };
 		F5C7CEAB82B6C78CFCC61E95 /* ExportPlanTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3441C765B2B441458DBF388E /* ExportPlanTests.swift */; };
 		FB37156109108E08EEFA14AF /* EndBumperGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E31A7AA8C8E9D9C6DEBEE12 /* EndBumperGenerator.swift */; };
@@ -78,11 +82,13 @@
 		10B7A50CD67FB317E0A368EA /* AnnotationTimeRangeControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationTimeRangeControl.swift; sourceTree = "<group>"; };
 		122532ABA7CBEFA3B0F736BA /* Haptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Haptics.swift; sourceTree = "<group>"; };
 		17B8CFC4DEB21BBD5B041638 /* ShareSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareSheetView.swift; sourceTree = "<group>"; };
+		1C1C6D6A6341BD85A4D9923B /* TimelineCoordinateMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineCoordinateMapper.swift; sourceTree = "<group>"; };
 		204A2916A871BFC20003B3EF /* AnnotationMarkerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationMarkerView.swift; sourceTree = "<group>"; };
 		223469245EACB17245F7C142 /* AudioSyncTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioSyncTests.swift; sourceTree = "<group>"; };
 		2E561E3BA7FCBE22CA60373D /* PlaybackControlsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackControlsView.swift; sourceTree = "<group>"; };
 		2E9CB7C84D4318E8BDDE7415 /* CoreoTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = CoreoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		3441C765B2B441458DBF388E /* ExportPlanTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportPlanTests.swift; sourceTree = "<group>"; };
+		47513E4279EAAB51B7A2EF2E /* PlaybackCoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackCoreTests.swift; sourceTree = "<group>"; };
 		524202D1ED4345FE4213C721 /* Coreo.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Coreo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		58CB611F8B2FB596771CBDD3 /* AnnotationModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationModelTests.swift; sourceTree = "<group>"; };
 		5AD1ADC5FF63295B2FCD6D6E /* VideoAsset.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoAsset.swift; sourceTree = "<group>"; };
@@ -92,6 +98,7 @@
 		6380205E5DE7FB1904B715B3 /* ExportPlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportPlan.swift; sourceTree = "<group>"; };
 		67B4833D4AEB1C54181B78FC /* ImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportView.swift; sourceTree = "<group>"; };
 		68D54D077EAC1686114A6DAF /* AnnotationCompositor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationCompositor.swift; sourceTree = "<group>"; };
+		6D3BF7B072CCC0B9693CFCF6 /* HoldPlaybackCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HoldPlaybackCoordinator.swift; sourceTree = "<group>"; };
 		77156C7733C0AB696540D574 /* CoreoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreoApp.swift; sourceTree = "<group>"; };
 		78F1A7D9A2CAB2FD38866CB5 /* TimeFormatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeFormatting.swift; sourceTree = "<group>"; };
 		836D9C50D78CB209852F60F1 /* LayoutEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayoutEngineTests.swift; sourceTree = "<group>"; };
@@ -102,6 +109,7 @@
 		90718819F8E6772FBCEE7DF7 /* TextAnnotationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextAnnotationView.swift; sourceTree = "<group>"; };
 		967070AE92BF269CB742DE76 /* TimeMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeMapper.swift; sourceTree = "<group>"; };
 		96B4D40807A1C61DCC01B373 /* CoreoProject.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreoProject.swift; sourceTree = "<group>"; };
+		97FB09D975CAE1BBC153A72C /* PlayerSyncPlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerSyncPlan.swift; sourceTree = "<group>"; };
 		9AF6BB6BEEE6C897FF2FCE9F /* LayoutEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayoutEngine.swift; sourceTree = "<group>"; };
 		9E31A7AA8C8E9D9C6DEBEE12 /* EndBumperGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EndBumperGenerator.swift; sourceTree = "<group>"; };
 		9FAFFD4521E9245038C8190E /* ProjectStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectStore.swift; sourceTree = "<group>"; };
@@ -256,7 +264,10 @@
 		B4B26E87F6BB14D34CBACF0E /* Workspace */ = {
 			isa = PBXGroup;
 			children = (
+				6D3BF7B072CCC0B9693CFCF6 /* HoldPlaybackCoordinator.swift */,
 				2E561E3BA7FCBE22CA60373D /* PlaybackControlsView.swift */,
+				97FB09D975CAE1BBC153A72C /* PlayerSyncPlan.swift */,
+				1C1C6D6A6341BD85A4D9923B /* TimelineCoordinateMapper.swift */,
 				DA8718750B9BDC0A9915EA7C /* TimelineView.swift */,
 				CAC4621903D1097792D1D1FA /* VideoGridView.swift */,
 				5C2A18427C7F0F179AC064EC /* VideoPanelView.swift */,
@@ -296,6 +307,7 @@
 				3441C765B2B441458DBF388E /* ExportPlanTests.swift */,
 				836D9C50D78CB209852F60F1 /* LayoutEngineTests.swift */,
 				8A301A071F44CBD5AEC1FD92 /* ModelTests.swift */,
+				47513E4279EAAB51B7A2EF2E /* PlaybackCoreTests.swift */,
 				D7427923A6B67371B8FC970A /* TimeFormattingTests.swift */,
 				A89F0A47A1720B4CBB0E639D /* TimeMapperTests.swift */,
 			);
@@ -408,6 +420,7 @@
 				F5C7CEAB82B6C78CFCC61E95 /* ExportPlanTests.swift in Sources */,
 				D185F932C17DCB61BE7A80E0 /* LayoutEngineTests.swift in Sources */,
 				F228C47A79A6A07C5778E9E0 /* ModelTests.swift in Sources */,
+				F085E7E53E38C3E89F070C03 /* PlaybackCoreTests.swift in Sources */,
 				DED036A789007E2738FCA0FC /* TimeFormattingTests.swift in Sources */,
 				8D3278A333338F724ED712B3 /* TimeMapperTests.swift in Sources */,
 			);
@@ -440,12 +453,14 @@
 				540A2FB954CC4338A7A3F735 /* FFTHelper.swift in Sources */,
 				DD03ED92FF9569E3A1BA3C0E /* Haptics.swift in Sources */,
 				C2878BA34040DC5DD5C066FA /* HoldMarkerView.swift in Sources */,
+				8872A8A83B47B27015CC73E4 /* HoldPlaybackCoordinator.swift in Sources */,
 				7800F9B14B302F9FF3795F67 /* ImportView.swift in Sources */,
 				5650A40D272153DABC7FEE49 /* ImportViewModel.swift in Sources */,
 				D256488305511E5DBCB486AD /* LayoutEngine.swift in Sources */,
 				C9A8E136D4252B14D2D9BF48 /* PanelCompositor.swift in Sources */,
 				025333983E82CCB388C07593 /* PersonDetector.swift in Sources */,
 				AB020E78BA55C8521E0A7E9A /* PlaybackControlsView.swift in Sources */,
+				E42542171136EEB19CEBA1EA /* PlayerSyncPlan.swift in Sources */,
 				408168F1F5086F5662BABB79 /* ProjectStore.swift in Sources */,
 				99DC36ED891777F069FF83EF /* ShareSheetView.swift in Sources */,
 				57FF4F413AAC4D2EA45A2221 /* SmartCropEngine.swift in Sources */,
@@ -454,6 +469,7 @@
 				04B933A9922BB74821C2EC9A /* TextAnnotationView.swift in Sources */,
 				3E9FD381B8ADA32A73C2FD56 /* TimeFormatting.swift in Sources */,
 				0D9190ED50440ABA002B1D11 /* TimeMapper.swift in Sources */,
+				9E4EA868BB2E406C37B5F321 /* TimelineCoordinateMapper.swift in Sources */,
 				5BB621D71435C829F4CD4410 /* TimelineView.swift in Sources */,
 				BFF5EFB5A279DEF1D9A6CC42 /* VideoAsset.swift in Sources */,
 				0EAE865536F349288705D643 /* VideoGridView.swift in Sources */,

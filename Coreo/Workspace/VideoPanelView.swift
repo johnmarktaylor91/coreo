@@ -26,6 +26,12 @@ struct VideoPanelView: View {
     /// Label to show when the video is inactive (e.g., "Starts in 0:04").
     let inactiveLabel: String?
 
+    /// Compact sync status label.
+    let syncStatusLabel: String
+
+    /// Called when the user nudges sync by a delta.
+    let onNudgeSync: (Double) -> Void
+
     /// Accumulated pinch-to-zoom scale.
     @State private var currentScale: CGFloat = 1.0
 
@@ -39,7 +45,7 @@ struct VideoPanelView: View {
     @State private var gestureDragOffset: CGSize = .zero
 
     var body: some View {
-        GeometryReader { geometry in
+        GeometryReader { _ in
             ZStack {
                 // Video layer — always present so AVPlayer keeps its attachment.
                 AVPlayerLayerView(player: player, cropRect: cropRect)
@@ -60,6 +66,16 @@ struct VideoPanelView: View {
                             .foregroundColor(.white.opacity(0.7))
                     }
                 }
+
+                VStack {
+                    HStack {
+                        syncStatusBadge
+                        Spacer()
+                        syncNudgeControls
+                    }
+                    Spacer()
+                }
+                .padding(6)
             }
             .clipped()
             .contentShape(Rectangle())
@@ -77,6 +93,48 @@ struct VideoPanelView: View {
         }
         .background(Color(red: 0.06, green: 0.06, blue: 0.06))
         .clipShape(RoundedRectangle(cornerRadius: 4))
+    }
+
+    /// Unobtrusive sync status badge.
+    private var syncStatusBadge: some View {
+        Text(syncStatusLabel)
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundColor(.white.opacity(0.78))
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(Color.black.opacity(0.45))
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+    }
+
+    /// Small per-panel manual sync nudge controls.
+    private var syncNudgeControls: some View {
+        HStack(spacing: 4) {
+            syncNudgeButton(label: "-1f", delta: -1.0 / 30.0)
+            syncNudgeButton(label: "+1f", delta: 1.0 / 30.0)
+            syncNudgeButton(label: "-.1", delta: -0.1)
+            syncNudgeButton(label: "+.1", delta: 0.1)
+        }
+    }
+
+    /// Builds one sync nudge button.
+    ///
+    /// - Parameters:
+    ///   - label: Button label.
+    ///   - delta: Sync offset delta.
+    /// - Returns: A nudge button view.
+    private func syncNudgeButton(label: String, delta: Double) -> some View {
+        Button {
+            Haptic.tick()
+            onNudgeSync(delta)
+        } label: {
+            Text(label)
+                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                .foregroundColor(.white.opacity(0.82))
+                .frame(width: 28, height: 24)
+                .background(Color.black.opacity(0.5))
+                .clipShape(RoundedRectangle(cornerRadius: 4))
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Gestures
@@ -143,7 +201,7 @@ struct AVPlayerLayerView: UIViewRepresentable {
     /// to show only the specified region of the video frame.
     let cropRect: CGRect?
 
-    func makeUIView(context: Context) -> PlayerUIView {
+    func makeUIView(context _: Context) -> PlayerUIView {
         let view = PlayerUIView()
         view.playerLayer.player = player
         view.playerLayer.videoGravity = cropRect != nil ? .resizeAspectFill : .resizeAspect
@@ -151,7 +209,7 @@ struct AVPlayerLayerView: UIViewRepresentable {
         return view
     }
 
-    func updateUIView(_ uiView: PlayerUIView, context: Context) {
+    func updateUIView(_ uiView: PlayerUIView, context _: Context) {
         // Update player reference if it changed.
         if uiView.playerLayer.player !== player {
             uiView.playerLayer.player = player
@@ -163,30 +221,7 @@ struct AVPlayerLayerView: UIViewRepresentable {
             uiView.playerLayer.videoGravity = gravity
         }
 
-        // Apply or remove crop mask.
-        applyCropMask(to: uiView, crop: cropRect)
-    }
-
-    /// Applies a CALayer mask to simulate cropping to a normalized rect.
-    private func applyCropMask(to view: PlayerUIView, crop: CGRect?) {
-        guard let crop else {
-            view.layer.mask = nil
-            return
-        }
-
-        let bounds = view.bounds
-        guard bounds.width > 0, bounds.height > 0 else { return }
-
-        let maskFrame = CGRect(
-            x: crop.origin.x * bounds.width,
-            y: crop.origin.y * bounds.height,
-            width: crop.size.width * bounds.width,
-            height: crop.size.height * bounds.height
-        )
-
-        let maskLayer = CAShapeLayer()
-        maskLayer.path = UIBezierPath(rect: maskFrame).cgPath
-        view.layer.mask = maskLayer
+        uiView.cropRect = cropRect
     }
 }
 
@@ -195,6 +230,23 @@ struct AVPlayerLayerView: UIViewRepresentable {
 /// A UIView subclass whose layer class is AVPlayerLayer, giving us direct
 /// control over video rendering without an extra sublayer.
 final class PlayerUIView: UIView {
+    /// Reused crop mask layer.
+    private let cropMaskLayer = CAShapeLayer()
+
+    /// Last bounds used to build the crop mask path.
+    private var lastMaskBounds: CGRect = .null
+
+    /// Last crop rect used to build the crop mask path.
+    private var lastMaskCropRect: CGRect?
+
+    /// Optional normalized crop rect.
+    var cropRect: CGRect? {
+        didSet {
+            guard cropRect != oldValue else { return }
+            setNeedsLayout()
+        }
+    }
+
     override class var layerClass: AnyClass {
         AVPlayerLayer.self
     }
@@ -204,5 +256,35 @@ final class PlayerUIView: UIView {
         // Safe: layerClass guarantees the layer type.
         // swiftlint:disable:next force_cast
         layer as! AVPlayerLayer
+    }
+
+    /// Updates the crop mask after layout changes.
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        updateCropMaskIfNeeded()
+    }
+
+    /// Applies or removes the reusable crop mask.
+    private func updateCropMaskIfNeeded() {
+        guard let cropRect else {
+            layer.mask = nil
+            lastMaskCropRect = nil
+            lastMaskBounds = .null
+            return
+        }
+
+        guard bounds.width > 0, bounds.height > 0 else { return }
+        guard cropRect != lastMaskCropRect || bounds != lastMaskBounds else { return }
+
+        let maskFrame = CGRect(
+            x: cropRect.origin.x * bounds.width,
+            y: cropRect.origin.y * bounds.height,
+            width: cropRect.size.width * bounds.width,
+            height: cropRect.size.height * bounds.height
+        )
+        cropMaskLayer.path = UIBezierPath(rect: maskFrame).cgPath
+        layer.mask = cropMaskLayer
+        lastMaskCropRect = cropRect
+        lastMaskBounds = bounds
     }
 }

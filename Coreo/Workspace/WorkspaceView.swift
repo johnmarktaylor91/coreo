@@ -50,6 +50,10 @@ struct WorkspaceView: View {
                         containerSize: geometry.size
                     )
 
+                    if let hold = viewModel.activeHoldEvent {
+                        holdIndicator(hold)
+                    }
+
                     // Annotation overlay — renders existing annotations + creation tools.
                     if viewModel.isAnnotationMode {
                         AnnotationOverlayView(
@@ -216,6 +220,20 @@ struct WorkspaceView: View {
 
                 toolDivider
 
+                Button {
+                    Haptic.medium()
+                    viewModel.resyncProject()
+                } label: {
+                    Label(viewModel.isResyncing ? "Syncing" : "Re-sync", systemImage: "waveform")
+                        .font(.caption)
+                        .foregroundColor(viewModel.isResyncing ? accentCoral : .white.opacity(0.7))
+                        .frame(minHeight: 44)
+                }
+                .buttonStyle(.coreoToolbar)
+                .disabled(viewModel.isResyncing)
+
+                toolDivider
+
                 // Export aspect ratio picker
                 exportAspectPicker
 
@@ -257,6 +275,30 @@ struct WorkspaceView: View {
         Divider()
             .frame(height: 16)
             .background(Color.white.opacity(0.15))
+    }
+
+    /// Visible indicator for an intentional live hold.
+    ///
+    /// - Parameter event: Active hold event.
+    /// - Returns: Hold indicator view.
+    private func holdIndicator(_ event: HoldPlaybackCoordinator.HoldEvent) -> some View {
+        VStack {
+            HStack {
+                Spacer()
+                Label(
+                    "Hold \(TimeFormatting.formatShort(event.wallDurationSeconds))",
+                    systemImage: "pause.circle.fill"
+                )
+                .font(.caption.weight(.semibold))
+                .foregroundColor(.white)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Color.red.opacity(0.72))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+            }
+            Spacer()
+        }
+        .padding(12)
     }
 
     /// Menu for switching the active audio source among imported videos.

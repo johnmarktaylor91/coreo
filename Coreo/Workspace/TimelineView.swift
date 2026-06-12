@@ -43,6 +43,10 @@ struct TimelineView: View {
     var body: some View {
         GeometryReader { geometry in
             let width = geometry.size.width
+            let contentWidth = TimelineCoordinateMapper(
+                startSeconds: timelineStart,
+                endSeconds: timelineEnd
+            ).contentWidth(totalWidth: width)
             ZStack(alignment: .topLeading) {
                 // Background
                 panelBackground
@@ -50,19 +54,19 @@ struct TimelineView: View {
 
                 VStack(spacing: 0) {
                     // 1. Video coverage bars
-                    videoCoverageBars(width: width)
+                    videoCoverageBars(width: contentWidth)
                         .frame(height: 12)
 
                     // 2. Speed segment overlays
-                    speedSegmentOverlays(width: width)
+                    speedSegmentOverlays(width: contentWidth)
                         .frame(height: 4)
 
                     // 3. Main scrub area with playhead
-                    scrubArea(width: width)
+                    scrubArea(width: contentWidth)
                         .frame(height: 40)
 
                     // Time labels
-                    timeLabels(width: width)
+                    timeLabels(width: contentWidth)
                         .frame(height: 12)
 
                     // 4. Annotation markers
@@ -111,9 +115,12 @@ struct TimelineView: View {
     ///   - width: The available drawing width (after horizontal padding).
     /// - Returns: The x-coordinate within the scrub area.
     private func xPosition(for seconds: Double, in width: CGFloat) -> CGFloat {
-        guard timelineDuration > 0 else { return 0 }
-        let fraction = (seconds - timelineStart) / timelineDuration
-        return CGFloat(fraction) * width
+        TimelineCoordinateMapper(
+            startSeconds: timelineStart,
+            endSeconds: timelineEnd,
+            leadingInset: 0,
+            trailingInset: 0
+        ).x(for: seconds, totalWidth: width)
     }
 
     /// Converts an x-coordinate to a timeline position in seconds.
@@ -123,10 +130,12 @@ struct TimelineView: View {
     ///   - width: The available drawing width (after horizontal padding).
     /// - Returns: The timeline position in seconds, clamped to bounds.
     private func seconds(for xPosition: CGFloat, in width: CGFloat) -> Double {
-        guard width > 0 else { return timelineStart }
-        let fraction = Double(xPosition / width)
-        let clamped = min(max(fraction, 0), 1)
-        return timelineStart + clamped * timelineDuration
+        TimelineCoordinateMapper(
+            startSeconds: timelineStart,
+            endSeconds: timelineEnd,
+            leadingInset: 0,
+            trailingInset: 0
+        ).seconds(forX: xPosition, totalWidth: width)
     }
 
     // MARK: - Video Coverage Bars
@@ -143,16 +152,16 @@ struct TimelineView: View {
                 let videoStart = offset
                 let videoEnd = offset + video.durationSeconds
 
-                let x = xPosition(for: videoStart, in: usableWidth)
+                let startX = xPosition(for: videoStart, in: usableWidth)
                 let endX = xPosition(for: videoEnd, in: usableWidth)
-                let barWidth = max(endX - x, 1)
+                let barWidth = max(endX - startX, 1)
 
                 let color = coverageColors[index % coverageColors.count]
 
                 RoundedRectangle(cornerRadius: 1.5)
                     .fill(color.opacity(0.5))
                     .frame(width: barWidth, height: 3)
-                    .offset(x: x, y: CGFloat(index) * 3.5)
+                    .offset(x: startX, y: CGFloat(index) * 3.5)
             }
         }
     }
@@ -167,16 +176,16 @@ struct TimelineView: View {
             Color.clear
 
             ForEach(viewModel.project.speedSegments) { segment in
-                let x = xPosition(for: segment.startTimeSeconds, in: usableWidth)
+                let startX = xPosition(for: segment.startTimeSeconds, in: usableWidth)
                 let endX = xPosition(for: segment.startTimeSeconds + segment.durationSeconds, in: usableWidth)
-                let segWidth = max(endX - x, 1)
+                let segWidth = max(endX - startX, 1)
 
                 let color = speedSegmentColor(for: segment)
 
                 RoundedRectangle(cornerRadius: 1)
                     .fill(color.opacity(0.6))
                     .frame(width: segWidth, height: 4)
-                    .offset(x: x)
+                    .offset(x: startX)
             }
         }
     }
@@ -218,8 +227,7 @@ struct TimelineView: View {
     }
 
     /// The playhead indicator: a thin white vertical line with a circle handle.
-    @ViewBuilder
-    private func playheadView(at x: CGFloat) -> some View {
+    private func playheadView(at xPosition: CGFloat) -> some View {
         ZStack(alignment: .top) {
             // Vertical line
             Rectangle()
@@ -233,14 +241,13 @@ struct TimelineView: View {
                 .shadow(color: .black.opacity(0.4), radius: 2, x: 0, y: 1)
                 .offset(y: -4)
         }
-        .offset(x: x - 1)
+        .offset(x: xPosition - 1)
     }
 
     // MARK: - Time Labels
 
     /// Current time and total duration labels flanking the scrub area.
-    @ViewBuilder
-    private func timeLabels(width: CGFloat) -> some View {
+    private func timeLabels(width _: CGFloat) -> some View {
         HStack {
             Text(TimeFormatting.format(viewModel.currentTimeSeconds))
                 .font(.system(size: 9, weight: .medium, design: .monospaced))
@@ -260,7 +267,8 @@ struct TimelineView: View {
     @ViewBuilder
     private func trimOverlay(width: CGFloat) -> some View {
         if let trimStart = viewModel.project.timelineTrimStartSeconds,
-           let trimDuration = viewModel.project.timelineTrimDurationSeconds {
+           let trimDuration = viewModel.project.timelineTrimDurationSeconds
+        {
             let usableWidth = width - 16 // account for horizontal padding
             let trimEnd = trimStart + trimDuration
 
@@ -318,10 +326,11 @@ struct TimelineView: View {
                 }
                 let xInPadded = value.location.x - 8
                 let time = seconds(for: xInPadded, in: usableWidth)
-                viewModel.seek(to: time)
+                viewModel.seek(to: time, precise: false)
             }
             .onEnded { _ in
                 isDragging = false
+                viewModel.seek(to: viewModel.currentTimeSeconds, precise: true)
                 if wasPlayingBeforeDrag && !viewModel.isPlaying {
                     viewModel.togglePlayback()
                 }

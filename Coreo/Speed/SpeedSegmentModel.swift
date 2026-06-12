@@ -8,7 +8,7 @@
 import Foundation
 
 /// A time range on the timeline with a modified playback rate.
-struct SpeedSegment: Codable, Identifiable {
+struct SpeedSegment: Codable, Identifiable, Equatable {
     /// Unique identifier for this segment.
     let id: UUID
 
@@ -40,11 +40,19 @@ struct SpeedMap {
     /// The underlying speed segments.
     var segments: [SpeedSegment]
 
+    /// Segments sorted by descending start for rate precedence.
+    private let segmentsByPrecedence: [SpeedSegment]
+
+    /// Segments sorted by ascending start for boundary scans.
+    private let segmentsByStart: [SpeedSegment]
+
     /// Creates a speed map from the given segments.
     ///
     /// - Parameter segments: Initial segments. Defaults to empty.
     init(segments: [SpeedSegment] = []) {
         self.segments = segments
+        segmentsByPrecedence = segments.sorted { $0.startTimeSeconds > $1.startTimeSeconds }
+        segmentsByStart = segments.sorted { $0.startTimeSeconds < $1.startTimeSeconds }
     }
 
     /// Returns the playback rate at a given timeline time.
@@ -56,17 +64,15 @@ struct SpeedMap {
     /// - Parameter timeSeconds: The timeline position to query.
     /// - Returns: The playback rate at that time.
     func rate(at timeSeconds: Double) -> Float {
-        // Find all segments covering this time, prefer the latest-starting one
-        let covering = segments
-            .filter { timeSeconds >= $0.startTimeSeconds && timeSeconds < $0.endTimeSeconds }
-            .sorted { $0.startTimeSeconds > $1.startTimeSeconds }
-
-        return covering.first?.rate ?? 1.0
+        let segment = segmentsByPrecedence.first {
+            timeSeconds >= $0.startTimeSeconds && timeSeconds < $0.endTimeSeconds
+        }
+        return segment?.rate ?? 1.0
     }
 
     /// All segments sorted by start time.
     var sortedSegments: [SpeedSegment] {
-        segments.sorted { $0.startTimeSeconds < $1.startTimeSeconds }
+        segmentsByStart
     }
 
     /// Adds a new speed segment, splitting or removing any overlapping existing segments.
@@ -88,8 +94,8 @@ struct SpeedMap {
             }
 
             // Existing is fully contained by new segment — remove it
-            if existing.startTimeSeconds >= segment.startTimeSeconds
-                && existing.endTimeSeconds <= segment.endTimeSeconds
+            if existing.startTimeSeconds >= segment.startTimeSeconds,
+               existing.endTimeSeconds <= segment.endTimeSeconds
             {
                 continue
             }
@@ -111,13 +117,13 @@ struct SpeedMap {
         }
 
         updated.append(segment)
-        segments = updated
+        self = SpeedMap(segments: updated)
     }
 
     /// Removes the segment with the given ID.
     ///
     /// - Parameter id: The unique identifier of the segment to remove.
     mutating func removeSegment(id: UUID) {
-        segments.removeAll { $0.id == id }
+        self = SpeedMap(segments: segments.filter { $0.id != id })
     }
 }
