@@ -26,8 +26,39 @@ struct TimedAnnotation: Codable, Identifiable {
     /// The visual content of the annotation.
     var content: AnnotationContent
 
+    /// Size of the video-grid canvas where this annotation was authored.
+    var canvasSize: CGSize?
+
     /// Timestamp when this annotation was created.
     var createdAt: Date
+
+    /// Creates a timed annotation.
+    ///
+    /// - Parameters:
+    ///   - id: Unique annotation identity.
+    ///   - startTimeSeconds: Timeline time when the annotation becomes visible.
+    ///   - durationSeconds: Visible duration in timeline seconds.
+    ///   - isPersistent: Whether the annotation remains visible for the full timeline.
+    ///   - content: Visual annotation payload.
+    ///   - canvasSize: Size of the authoring video-grid canvas.
+    ///   - createdAt: Creation timestamp.
+    init(
+        id: UUID,
+        startTimeSeconds: Double,
+        durationSeconds: Double,
+        isPersistent: Bool,
+        content: AnnotationContent,
+        canvasSize: CGSize? = nil,
+        createdAt: Date
+    ) {
+        self.id = id
+        self.startTimeSeconds = startTimeSeconds
+        self.durationSeconds = durationSeconds
+        self.isPersistent = isPersistent
+        self.content = content
+        self.canvasSize = canvasSize
+        self.createdAt = createdAt
+    }
 
     // MARK: - Computed Properties
 
@@ -82,6 +113,14 @@ struct TimedAnnotation: Codable, Identifiable {
     func isVisible(at currentTime: Double) -> Bool {
         if isPersistent { return true }
         return currentTime >= startTimeSeconds && currentTime <= endTimeSeconds
+    }
+
+    /// Stable content signature used to invalidate raster caches.
+    ///
+    /// - Returns: A deterministic string for annotation content and geometry.
+    func rasterCacheSignature() -> String {
+        let canvas = canvasSize.map { "\($0.width)x\($0.height)" } ?? "nil"
+        return "\(id.uuidString)|\(canvas)|\(content.rasterCacheSignature())"
     }
 
     /// Calculates a default 3-second annotation window centered on the playhead,
@@ -161,15 +200,29 @@ enum AnnotationContent: Codable {
         var container = encoder.container(keyedBy: CodingKeys.self)
 
         switch self {
-        case .drawing(let drawing):
+        case let .drawing(drawing):
             try container.encode(ContentType.drawing, forKey: .type)
             try container.encode(drawing, forKey: .payload)
-        case .text(let text):
+        case let .text(text):
             try container.encode(ContentType.text, forKey: .type)
             try container.encode(text, forKey: .payload)
-        case .arrow(let arrow):
+        case let .arrow(arrow):
             try container.encode(ContentType.arrow, forKey: .type)
             try container.encode(arrow, forKey: .payload)
+        }
+    }
+
+    /// Stable content signature used to invalidate raster caches.
+    ///
+    /// - Returns: A deterministic string for the visual content.
+    func rasterCacheSignature() -> String {
+        switch self {
+        case let .drawing(drawing):
+            drawing.rasterCacheSignature()
+        case let .text(text):
+            text.rasterCacheSignature()
+        case let .arrow(arrow):
+            arrow.rasterCacheSignature()
         }
     }
 }
@@ -180,6 +233,13 @@ enum AnnotationContent: Codable {
 struct DrawingAnnotation: Codable {
     /// PKDrawing serialized via `dataRepresentation()`.
     var drawingData: Data
+
+    /// Stable content signature used to invalidate raster caches.
+    ///
+    /// - Returns: A deterministic string for the drawing payload.
+    func rasterCacheSignature() -> String {
+        "drawing:\(drawingData.count):\(drawingData.base64EncodedString())"
+    }
 }
 
 // MARK: - Text Annotation
@@ -197,6 +257,13 @@ struct TextAnnotation: Codable {
 
     /// Color as a hex string (e.g., "#FFFFFF").
     var colorHex: String
+
+    /// Stable content signature used to invalidate raster caches.
+    ///
+    /// - Returns: A deterministic string for the text payload.
+    func rasterCacheSignature() -> String {
+        "text:\(text)|\(position.x),\(position.y)|\(fontSize)|\(colorHex)"
+    }
 }
 
 // MARK: - Arrow Annotation
@@ -214,6 +281,13 @@ struct ArrowAnnotation: Codable {
 
     /// Stroke width in points.
     var lineWidth: CGFloat
+
+    /// Stable content signature used to invalidate raster caches.
+    ///
+    /// - Returns: A deterministic string for the arrow payload.
+    func rasterCacheSignature() -> String {
+        "arrow:\(start.x),\(start.y)|\(end.x),\(end.y)|\(lineWidth)|\(colorHex)"
+    }
 }
 
 // MARK: - Color Palette
@@ -226,7 +300,7 @@ extension TimedAnnotation {
         ("Yellow", "#FFD60A"),
         ("Cyan", "#64D2FF"),
         ("Green", "#30D158"),
-        ("Orange", "#FF9F0A")
+        ("Orange", "#FF9F0A"),
     ]
 }
 

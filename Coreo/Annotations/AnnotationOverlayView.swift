@@ -28,6 +28,9 @@ struct AnnotationOverlayView: View {
     @State private var pendingTextInput: String = ""
     @State private var showTextInput: Bool = false
 
+    /// Cached annotation rasters for playback and editing preview.
+    @State private var rasterCache = AnnotationRasterCache()
+
     var body: some View {
         ZStack {
             // Render all visible annotations (always, regardless of mode).
@@ -47,6 +50,9 @@ struct AnnotationOverlayView: View {
             TextField("Annotation text", text: $pendingTextInput)
             Button("Add") { commitTextAnnotation() }
             Button("Cancel", role: .cancel) { pendingTextInput = "" }
+        }
+        .onChange(of: annotationStore.annotations.map { $0.rasterCacheSignature() }) {
+            rasterCache.removeAll()
         }
     }
 
@@ -104,7 +110,7 @@ struct AnnotationOverlayView: View {
 
     private func commitDrawing() {
         let data = currentDrawing.dataRepresentation()
-        viewModel.addDrawingAnnotation(drawingData: data)
+        viewModel.addDrawingAnnotation(drawingData: data, canvasSize: containerSize)
         currentDrawing = PKDrawing()
     }
 
@@ -127,7 +133,7 @@ struct AnnotationOverlayView: View {
 
     private func commitTextAnnotation() {
         guard let position = pendingTextPosition else { return }
-        viewModel.addTextAnnotation(text: pendingTextInput, position: position)
+        viewModel.addTextAnnotation(text: pendingTextInput, position: position, canvasSize: containerSize)
         pendingTextPosition = nil
         pendingTextInput = ""
     }
@@ -171,7 +177,11 @@ struct AnnotationOverlayView: View {
                     x: value.location.x / containerSize.width,
                     y: value.location.y / containerSize.height
                 )
-                viewModel.addArrowAnnotation(start: normalizedStart, end: normalizedEnd)
+                viewModel.addArrowAnnotation(
+                    start: normalizedStart,
+                    end: normalizedEnd,
+                    canvasSize: containerSize
+                )
                 arrowDragStart = nil
                 arrowDragCurrent = nil
             }
@@ -251,41 +261,11 @@ struct AnnotationOverlayView: View {
 
     @ViewBuilder
     private func annotationView(for annotation: TimedAnnotation) -> some View {
-        switch annotation.content {
-        case let .drawing(drawing):
-            drawingView(for: drawing)
-        case let .text(text):
-            TextAnnotationView(
-                annotation: text,
-                isSelected: annotationStore.selectedAnnotationID == annotation.id,
-                onTap: {
-                    if viewModel.isAnnotationMode {
-                        if annotationStore.selectedAnnotationTool == .eraser {
-                            viewModel.deleteAnnotation(id: annotation.id)
-                        } else {
-                            annotationStore.selectedAnnotationID = annotation.id
-                        }
-                    }
-                },
-                onDrag: { newPosition in
-                    viewModel.updateAnnotationPosition(id: annotation.id, position: newPosition)
-                },
-                containerSize: containerSize
-            )
-        case let .arrow(arrow):
-            ArrowAnnotationView(
-                annotation: arrow,
-                isSelected: annotationStore.selectedAnnotationID == annotation.id,
-                containerSize: containerSize
-            )
-        }
-    }
-
-    @ViewBuilder
-    private func drawingView(for drawing: DrawingAnnotation) -> some View {
-        if let pkDrawing = try? PKDrawing(data: drawing.drawingData) {
-            let bounds = CGRect(origin: .zero, size: containerSize)
-            let image = pkDrawing.image(from: bounds, scale: 2.0)
+        if let image = rasterCache.image(
+            for: annotation,
+            destinationSize: containerSize,
+            render: { AnnotationRasterizer.image(for: annotation, destinationSize: containerSize) }
+        ) {
             Image(uiImage: image)
                 .resizable()
                 .frame(width: containerSize.width, height: containerSize.height)

@@ -60,15 +60,13 @@ struct WorkspaceView: View {
                         holdIndicator(hold)
                     }
 
-                    // Annotation overlay — renders existing annotations + creation tools.
-                    if viewModel.isAnnotationMode {
-                        AnnotationOverlayView(
-                            viewModel: viewModel,
-                            annotationStore: viewModel.annotations,
-                            playback: viewModel.playback,
-                            containerSize: geometry.size
-                        )
-                    }
+                    // Annotation overlay — always displays annotations; editing is mode-gated.
+                    AnnotationOverlayView(
+                        viewModel: viewModel,
+                        annotationStore: viewModel.annotations,
+                        playback: viewModel.playback,
+                        containerSize: geometry.size
+                    )
                 }
             }
 
@@ -157,7 +155,7 @@ struct WorkspaceView: View {
                 Haptic.light()
                 withAnimation(CoreoAnimation.standard) {
                     viewModel.isEditToolsVisible.toggle()
-                    if !viewModel.isEditToolsVisible && viewModel.isAnnotationMode {
+                    if !viewModel.isEditToolsVisible, viewModel.isAnnotationMode {
                         viewModel.exitAnnotationMode()
                     }
                 }
@@ -209,6 +207,19 @@ struct WorkspaceView: View {
                 selectedColorHex: $bindableAnnotations.selectedAnnotationColorHex
             )
 
+            if let selectedID = viewModel.annotations.selectedAnnotationID,
+               annotationExists(id: selectedID)
+            {
+                AnnotationTimeRangeControl(
+                    startTimeSeconds: timingStartBinding(id: selectedID),
+                    durationSeconds: timingDurationBinding(id: selectedID),
+                    isPersistent: timingPersistentBinding(id: selectedID),
+                    timelineStart: viewModel.timelineStart,
+                    timelineEnd: viewModel.timelineEnd
+                )
+                .transition(.opacity)
+            }
+
             Divider().background(Color.white.opacity(0.15))
 
             // Row 2: Speed/Hold + Audio Source + Export Aspect
@@ -258,6 +269,90 @@ struct WorkspaceView: View {
         .padding(.horizontal, Spacing.lg)
         .padding(.vertical, 10)
         .background(Color(red: 0.1, green: 0.1, blue: 0.1).opacity(0.95))
+    }
+
+    /// Returns whether an annotation exists in the current store.
+    ///
+    /// - Parameter id: Annotation identity.
+    /// - Returns: True when the annotation is present.
+    private func annotationExists(id: UUID) -> Bool {
+        viewModel.annotations.annotations.contains { $0.id == id }
+    }
+
+    /// Builds a binding to an annotation's start time.
+    ///
+    /// - Parameter id: Annotation identity.
+    /// - Returns: Binding that persists changes through the workspace model.
+    private func timingStartBinding(id: UUID) -> Binding<Double> {
+        Binding(
+            get: { annotationValue(id: id, keyPath: \.startTimeSeconds) ?? viewModel.timelineStart },
+            set: { newValue in
+                updateAnnotationTiming(id: id, startTimeSeconds: newValue)
+            }
+        )
+    }
+
+    /// Builds a binding to an annotation's duration.
+    ///
+    /// - Parameter id: Annotation identity.
+    /// - Returns: Binding that persists changes through the workspace model.
+    private func timingDurationBinding(id: UUID) -> Binding<Double> {
+        Binding(
+            get: { annotationValue(id: id, keyPath: \.durationSeconds) ?? 0 },
+            set: { newValue in
+                updateAnnotationTiming(id: id, durationSeconds: newValue)
+            }
+        )
+    }
+
+    /// Builds a binding to an annotation's persistence flag.
+    ///
+    /// - Parameter id: Annotation identity.
+    /// - Returns: Binding that persists changes through the workspace model.
+    private func timingPersistentBinding(id: UUID) -> Binding<Bool> {
+        Binding(
+            get: { annotationValue(id: id, keyPath: \.isPersistent) ?? false },
+            set: { newValue in
+                updateAnnotationTiming(id: id, isPersistent: newValue)
+            }
+        )
+    }
+
+    /// Reads one annotation value from the store.
+    ///
+    /// - Parameters:
+    ///   - id: Annotation identity.
+    ///   - keyPath: Annotation property to read.
+    /// - Returns: The stored value when available.
+    private func annotationValue<Value>(
+        id: UUID,
+        keyPath: KeyPath<TimedAnnotation, Value>
+    ) -> Value? {
+        viewModel.annotations.annotations.first { $0.id == id }?[keyPath: keyPath]
+    }
+
+    /// Persists a partial timing update for one annotation.
+    ///
+    /// - Parameters:
+    ///   - id: Annotation identity.
+    ///   - startTimeSeconds: Optional replacement start time.
+    ///   - durationSeconds: Optional replacement duration.
+    ///   - isPersistent: Optional replacement persistence flag.
+    private func updateAnnotationTiming(
+        id: UUID,
+        startTimeSeconds: Double? = nil,
+        durationSeconds: Double? = nil,
+        isPersistent: Bool? = nil
+    ) {
+        guard let annotation = viewModel.annotations.annotations.first(where: { $0.id == id }) else {
+            return
+        }
+        viewModel.updateAnnotationTiming(
+            id: id,
+            startTimeSeconds: startTimeSeconds ?? annotation.startTimeSeconds,
+            durationSeconds: durationSeconds ?? annotation.durationSeconds,
+            isPersistent: isPersistent ?? annotation.isPersistent
+        )
     }
 
     /// Warning panel for copied media files missing from disk.

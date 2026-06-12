@@ -64,6 +64,9 @@ final class WorkspaceViewModel {
     /// Whether playback was active before the app went to background.
     private var wasPlayingBeforeBackground = false
 
+    /// Whether playback was active before entering annotation mode.
+    private var wasPlayingBeforeAnnotationMode = false
+
     /// Earliest point on the timeline.
     var timelineStart: Double {
         project.timelineStartSeconds
@@ -150,22 +153,30 @@ final class WorkspaceViewModel {
         if let tool {
             annotations.selectedAnnotationTool = tool
         }
+        if !isAnnotationMode {
+            wasPlayingBeforeAnnotationMode = playback.isPlaying
+        }
         isAnnotationMode = true
         playback.pauseIfNeeded()
     }
 
-    /// Exits annotation mode. Does not auto-resume playback.
+    /// Exits annotation mode and resumes playback if annotation entry paused it.
     func exitAnnotationMode() {
         isAnnotationMode = false
         annotations.clearSelection()
+        if wasPlayingBeforeAnnotationMode {
+            wasPlayingBeforeAnnotationMode = false
+            playback.resumePlayback()
+        }
     }
 
     /// Adds a freehand drawing annotation at the current playhead.
     ///
     /// - Parameter drawingData: PencilKit drawing data.
-    func addDrawingAnnotation(drawingData: Data) {
+    func addDrawingAnnotation(drawingData: Data, canvasSize: CGSize) {
         annotations.addDrawingAnnotation(
             drawingData: drawingData,
+            canvasSize: canvasSize,
             currentTimeSeconds: playback.currentTimeSeconds,
             timelineStart: timelineStart,
             timelineEnd: timelineEnd
@@ -178,10 +189,11 @@ final class WorkspaceViewModel {
     /// - Parameters:
     ///   - text: Text to render.
     ///   - position: Normalized annotation position.
-    func addTextAnnotation(text: String, position: CGPoint) {
+    func addTextAnnotation(text: String, position: CGPoint, canvasSize: CGSize) {
         annotations.addTextAnnotation(
             text: text,
             position: position,
+            canvasSize: canvasSize,
             currentTimeSeconds: playback.currentTimeSeconds,
             timelineStart: timelineStart,
             timelineEnd: timelineEnd
@@ -194,10 +206,11 @@ final class WorkspaceViewModel {
     /// - Parameters:
     ///   - start: Normalized start point.
     ///   - end: Normalized end point.
-    func addArrowAnnotation(start: CGPoint, end: CGPoint) {
+    func addArrowAnnotation(start: CGPoint, end: CGPoint, canvasSize: CGSize) {
         annotations.addArrowAnnotation(
             start: start,
             end: end,
+            canvasSize: canvasSize,
             currentTimeSeconds: playback.currentTimeSeconds,
             timelineStart: timelineStart,
             timelineEnd: timelineEnd
@@ -220,6 +233,28 @@ final class WorkspaceViewModel {
     ///   - position: Normalized position.
     func updateAnnotationPosition(id: UUID, position: CGPoint) {
         annotations.updateAnnotationPosition(id: id, position: position)
+        syncProjectAnnotationsFromStore()
+    }
+
+    /// Updates an annotation's visible timing window.
+    ///
+    /// - Parameters:
+    ///   - id: Annotation identity.
+    ///   - startTimeSeconds: New start time in timeline seconds.
+    ///   - durationSeconds: New visible duration in timeline seconds.
+    ///   - isPersistent: Whether the annotation should be shown for the full timeline.
+    func updateAnnotationTiming(
+        id: UUID,
+        startTimeSeconds: Double,
+        durationSeconds: Double,
+        isPersistent: Bool
+    ) {
+        annotations.updateAnnotationTiming(
+            id: id,
+            startTimeSeconds: startTimeSeconds,
+            durationSeconds: durationSeconds,
+            isPersistent: isPersistent
+        )
         syncProjectAnnotationsFromStore()
     }
 

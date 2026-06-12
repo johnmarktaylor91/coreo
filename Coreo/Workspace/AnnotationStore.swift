@@ -50,6 +50,7 @@ final class AnnotationStore {
     ///   - timelineEnd: Timeline end.
     func addDrawingAnnotation(
         drawingData: Data,
+        canvasSize: CGSize,
         currentTimeSeconds: Double,
         timelineStart: Double,
         timelineEnd: Double
@@ -65,9 +66,11 @@ final class AnnotationStore {
             durationSeconds: timeRange.duration,
             isPersistent: false,
             content: .drawing(DrawingAnnotation(drawingData: drawingData)),
+            canvasSize: canvasSize,
             createdAt: Date()
         )
         annotations.append(annotation)
+        selectedAnnotationID = annotation.id
     }
 
     /// Adds a text annotation at the given normalized position.
@@ -81,6 +84,7 @@ final class AnnotationStore {
     func addTextAnnotation(
         text: String,
         position: CGPoint,
+        canvasSize: CGSize,
         currentTimeSeconds: Double,
         timelineStart: Double,
         timelineEnd: Double
@@ -102,9 +106,11 @@ final class AnnotationStore {
                 fontSize: 16,
                 colorHex: selectedAnnotationColorHex
             )),
+            canvasSize: canvasSize,
             createdAt: Date()
         )
         annotations.append(annotation)
+        selectedAnnotationID = annotation.id
     }
 
     /// Adds an arrow annotation between two normalized points.
@@ -118,6 +124,7 @@ final class AnnotationStore {
     func addArrowAnnotation(
         start: CGPoint,
         end: CGPoint,
+        canvasSize: CGSize,
         currentTimeSeconds: Double,
         timelineStart: Double,
         timelineEnd: Double
@@ -141,9 +148,11 @@ final class AnnotationStore {
                 colorHex: selectedAnnotationColorHex,
                 lineWidth: 3
             )),
+            canvasSize: canvasSize,
             createdAt: Date()
         )
         annotations.append(annotation)
+        selectedAnnotationID = annotation.id
     }
 
     /// Deletes the annotation with the given ID.
@@ -167,5 +176,24 @@ final class AnnotationStore {
             text.position = position
             annotations[idx].content = .text(text)
         }
+    }
+
+    /// Updates an annotation's visible timing window.
+    ///
+    /// - Parameters:
+    ///   - id: Annotation identity.
+    ///   - startTimeSeconds: New start time in timeline seconds.
+    ///   - durationSeconds: New visible duration in timeline seconds.
+    ///   - isPersistent: Whether the annotation should be shown for the full timeline.
+    func updateAnnotationTiming(
+        id: UUID,
+        startTimeSeconds: Double,
+        durationSeconds: Double,
+        isPersistent: Bool
+    ) {
+        guard let idx = annotations.firstIndex(where: { $0.id == id }) else { return }
+        annotations[idx].startTimeSeconds = startTimeSeconds
+        annotations[idx].durationSeconds = durationSeconds
+        annotations[idx].isPersistent = isPersistent
     }
 }

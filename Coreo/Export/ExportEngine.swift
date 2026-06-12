@@ -8,7 +8,7 @@
 // 3. Optionally appending a 1-second end bumper
 // 4. Building an AVMutableVideoComposition with layout transforms AFTER all
 //    composition modifications (so the instruction covers the final duration)
-// 5. Leaving an annotation-rendering hook for the custom compositor
+// 5. Rendering annotations through the custom compositor
 // 6. Exporting via AVAssetExportSession
 
 import AVFoundation
@@ -155,8 +155,6 @@ enum ExportEngine {
         try Task.checkCancellation()
         progressHandler(0.35)
 
-        // Step 6: Annotation seam. Wave 5 will provide render items here.
-        // The custom compositor receives the empty hook through each instruction.
         progressHandler(0.40)
 
         // Step 7: Export.
@@ -360,7 +358,7 @@ enum ExportEngine {
     /// Builds the video composition using PanelCompositor for reliable
     /// multi-track rendering with per-panel clipping.
     private static func buildVideoComposition(
-        project _: CoreoProject,
+        project: CoreoProject,
         composition: AVMutableComposition,
         videoTracks: [AVMutableCompositionTrack],
         videoSizes: [CGSize],
@@ -400,11 +398,17 @@ enum ExportEngine {
 
         assert(mainPanelConfigs.count == videoTracks.count, "Export layout returned the wrong panel count.")
 
+        let annotationRenderer = AnnotationExportFrameRenderer(
+            annotations: project.annotations,
+            timeMapper: TimeMapper(project: project),
+            timelineStart: project.timelineStartSeconds
+        )
+
         let mainInstruction = PanelCompositionInstruction(
             timeRange: CMTimeRange(start: .zero, duration: mainContentDuration),
             panelConfigs: mainPanelConfigs,
             renderSize: renderSize,
-            annotationRenderer: EmptyAnnotationFrameRenderer()
+            annotationRenderer: annotationRenderer
         )
         instructions.append(mainInstruction)
 

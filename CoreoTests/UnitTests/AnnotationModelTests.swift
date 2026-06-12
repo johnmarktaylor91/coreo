@@ -4,12 +4,11 @@
 // Unit tests for annotation opacity, time range clamping, Codable
 // round-trips, and Color hex conversion.
 
-import XCTest
-import SwiftUI
 @testable import Coreo
+import SwiftUI
+import XCTest
 
 final class AnnotationModelTests: XCTestCase {
-
     // MARK: - Opacity Calculation
 
     func testOpacityBeforeRangeIsZero() {
@@ -78,6 +77,14 @@ final class AnnotationModelTests: XCTestCase {
         XCTAssertEqual(annotation.opacity(at: 0.0), 1.0, accuracy: 0.001)
         XCTAssertEqual(annotation.opacity(at: 100.0), 1.0, accuracy: 0.001)
         XCTAssertEqual(annotation.opacity(at: -50.0), 1.0, accuracy: 0.001)
+    }
+
+    func testShortAnnotationFadeEnvelopeNeverExceedsRange() {
+        let annotation = makeAnnotation(start: 2.0, duration: 0.2)
+
+        XCTAssertEqual(annotation.opacity(at: 2.0), 0.0, accuracy: 0.001)
+        XCTAssertEqual(annotation.opacity(at: 2.1), 0.5, accuracy: 0.001)
+        XCTAssertEqual(annotation.opacity(at: 2.2), 0.0, accuracy: 0.001)
     }
 
     // MARK: - Visibility
@@ -180,7 +187,7 @@ final class AnnotationModelTests: XCTestCase {
         let data = try JSONEncoder().encode(original)
         let decoded = try JSONDecoder().decode(AnnotationContent.self, from: data)
 
-        if case .text(let text) = decoded {
+        if case let .text(text) = decoded {
             XCTAssertEqual(text.text, "Hello")
             XCTAssertEqual(text.position.x, 0.3, accuracy: 0.001)
             XCTAssertEqual(text.position.y, 0.7, accuracy: 0.001)
@@ -202,7 +209,7 @@ final class AnnotationModelTests: XCTestCase {
         let data = try JSONEncoder().encode(original)
         let decoded = try JSONDecoder().decode(AnnotationContent.self, from: data)
 
-        if case .arrow(let arrow) = decoded {
+        if case let .arrow(arrow) = decoded {
             XCTAssertEqual(arrow.start.x, 0.1, accuracy: 0.001)
             XCTAssertEqual(arrow.start.y, 0.2, accuracy: 0.001)
             XCTAssertEqual(arrow.end.x, 0.8, accuracy: 0.001)
@@ -221,11 +228,154 @@ final class AnnotationModelTests: XCTestCase {
         let data = try JSONEncoder().encode(original)
         let decoded = try JSONDecoder().decode(AnnotationContent.self, from: data)
 
-        if case .drawing(let drawing) = decoded {
+        if case let .drawing(drawing) = decoded {
             XCTAssertEqual(drawing.drawingData, drawingData)
         } else {
             XCTFail("Expected drawing annotation content after decode")
         }
+    }
+
+    func testTimedAnnotationCodableRoundTripIncludesCanvasSize() throws {
+        let original = TimedAnnotation(
+            id: UUID(),
+            startTimeSeconds: 1,
+            durationSeconds: 2,
+            isPersistent: false,
+            content: .text(TextAnnotation(
+                text: "Canvas",
+                position: CGPoint(x: 0.25, y: 0.75),
+                fontSize: 16,
+                colorHex: "#FFFFFF"
+            )),
+            canvasSize: CGSize(width: 390, height: 844),
+            createdAt: Date(timeIntervalSince1970: 10)
+        )
+
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(TimedAnnotation.self, from: data)
+
+        XCTAssertEqual(decoded.canvasSize?.width, 390)
+        XCTAssertEqual(decoded.canvasSize?.height, 844)
+    }
+
+    func testTimedAnnotationDecodesLegacyPayloadWithoutCanvasSize() throws {
+        let json = """
+        {
+          "id": "00000000-0000-0000-0000-000000000001",
+          "startTimeSeconds": 1,
+          "durationSeconds": 2,
+          "isPersistent": false,
+          "content": {
+            "type": "text",
+            "payload": {
+              "text": "Legacy",
+              "position": [0.5, 0.5],
+              "fontSize": 16,
+              "colorHex": "#FFFFFF"
+            }
+          },
+          "createdAt": 10
+        }
+        """.data(using: .utf8)!
+
+        let decoded = try JSONDecoder().decode(TimedAnnotation.self, from: json)
+
+        XCTAssertNil(decoded.canvasSize)
+        XCTAssertEqual(decoded.startTimeSeconds, 1)
+    }
+
+    // MARK: - Coordinate Mapping
+
+    func testCoordinateMappingRoundTripsAuthoringCanvasToExportRect() {
+        let canvasSize = CGSize(width: 390, height: 844)
+        let authoringPoint = CGPoint(x: 97.5, y: 211)
+        let normalized = AnnotationCoordinateMapper.normalizedPoint(authoringPoint, canvasSize: canvasSize)
+        let destination = AnnotationCoordinateMapper.destinationPoint(
+            normalized,
+            destinationRect: CGRect(x: 120, y: 80, width: 960, height: 540)
+        )
+
+        XCTAssertEqual(normalized.x, 0.25, accuracy: 0.001)
+        XCTAssertEqual(normalized.y, 0.25, accuracy: 0.001)
+        XCTAssertEqual(destination.x, 360, accuracy: 0.001)
+        XCTAssertEqual(destination.y, 215, accuracy: 0.001)
+    }
+
+    func testCoordinateMappingUsesLetterboxedContentRect() {
+        let panelRect = CGRect(x: 0, y: 0, width: 960, height: 540)
+        let placement = ExportPlan.aspectFitTransform(
+            contentExtent: CGRect(x: 0, y: 0, width: 1080, height: 1920),
+            panelRect: panelRect
+        )
+        let contentRect = CGRect(
+            x: placement.offset.x,
+            y: placement.offset.y,
+            width: 1080 * placement.scale,
+            height: 1920 * placement.scale
+        )
+        let mapped = AnnotationCoordinateMapper.destinationPoint(
+            CGPoint(x: 0.5, y: 0.5),
+            destinationRect: contentRect
+        )
+
+        XCTAssertEqual(contentRect.width, 303.75, accuracy: 0.01)
+        XCTAssertEqual(contentRect.height, 540, accuracy: 0.01)
+        XCTAssertEqual(mapped.x, 480, accuracy: 0.01)
+        XCTAssertEqual(mapped.y, 270, accuracy: 0.01)
+    }
+
+    // MARK: - Raster Cache
+
+    func testRasterizerCacheInvalidatesOnEdit() {
+        let cache = AnnotationRasterCache()
+        let annotation = makeAnnotation(start: 0, duration: 1)
+        let size = CGSize(width: 240, height: 160)
+
+        XCTAssertNotNil(cache.image(
+            for: annotation,
+            destinationSize: size,
+            render: { AnnotationRasterizer.image(for: annotation, destinationSize: size) }
+        ))
+        XCTAssertEqual(cache.count, 1)
+
+        cache.invalidate(annotationID: annotation.id)
+
+        XCTAssertEqual(cache.count, 0)
+    }
+
+    func testRasterizerCacheCreatesNewEntryWhenContentChanges() {
+        let cache = AnnotationRasterCache()
+        let size = CGSize(width: 240, height: 160)
+        var annotation = makeAnnotation(start: 0, duration: 1)
+
+        _ = cache.image(
+            for: annotation,
+            destinationSize: size,
+            render: { AnnotationRasterizer.image(for: annotation, destinationSize: size) }
+        )
+        annotation.content = .text(TextAnnotation(
+            text: "Changed",
+            position: CGPoint(x: 0.5, y: 0.5),
+            fontSize: 16,
+            colorHex: "#FFFFFF"
+        ))
+        _ = cache.image(
+            for: annotation,
+            destinationSize: size,
+            render: { AnnotationRasterizer.image(for: annotation, destinationSize: size) }
+        )
+
+        XCTAssertEqual(cache.count, 2)
+    }
+
+    func testRasterizerDeterministicBytesAtFixedSize() throws {
+        let annotation = makeAnnotation(start: 0, duration: 1)
+        let size = CGSize(width: 240, height: 160)
+
+        let first = try XCTUnwrap(AnnotationRasterizer.image(for: annotation, destinationSize: size))
+        let second = try XCTUnwrap(AnnotationRasterizer.image(for: annotation, destinationSize: size))
+
+        XCTAssertEqual(rawBytes(first), rawBytes(second))
     }
 
     // MARK: - Color Hex Extension
@@ -294,5 +444,14 @@ final class AnnotationModelTests: XCTestCase {
             )),
             createdAt: Date()
         )
+    }
+
+    private func rawBytes(_ image: UIImage) -> Data? {
+        guard let cgImage = image.cgImage,
+              let providerData = cgImage.dataProvider?.data
+        else {
+            return nil
+        }
+        return providerData as Data
     }
 }

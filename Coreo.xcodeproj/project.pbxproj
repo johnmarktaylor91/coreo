@@ -12,6 +12,7 @@
 		0D9190ED50440ABA002B1D11 /* TimeMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 967070AE92BF269CB742DE76 /* TimeMapper.swift */; };
 		0DBBB0C8973EE59168E7DBAE /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = F53C8516EFED7C37FB2D8336 /* DesignSystem.swift */; };
 		0EAE865536F349288705D643 /* VideoGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAC4621903D1097792D1D1FA /* VideoGridView.swift */; };
+		0FEFECE0CD54AF821C38887E /* AnnotationRasterizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8AD2AD840D5DB2FD87D0B0F2 /* AnnotationRasterizer.swift */; };
 		168515ECCA30A987484393C2 /* ExportSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B40B7EB935411EB76E3A8C90 /* ExportSettings.swift */; };
 		16E4C26022BB6A2ABE8910AC /* AnnotationToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD3BC9669CA59FFAF4E59395 /* AnnotationToolbar.swift */; };
 		17FBF3A7FF4AF0CA8F431CAF /* LayoutCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49A4B8CEB51F38633802AE71 /* LayoutCache.swift */; };
@@ -37,7 +38,6 @@
 		79F68515F52DE6E991524427 /* CoreoButtonStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = BED2760714AD7D1641791886 /* CoreoButtonStyle.swift */; };
 		871B39EA4B8AC4BBB4A8D07D /* AudioSyncEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 601AFF2220AF62F912731742 /* AudioSyncEngine.swift */; };
 		8872A8A83B47B27015CC73E4 /* HoldPlaybackCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D3BF7B072CCC0B9693CFCF6 /* HoldPlaybackCoordinator.swift */; };
-		8A64B0C33D0259F54852A629 /* AnnotationCompositor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68D54D077EAC1686114A6DAF /* AnnotationCompositor.swift */; };
 		8D3278A333338F724ED712B3 /* TimeMapperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A89F0A47A1720B4CBB0E639D /* TimeMapperTests.swift */; };
 		90ACD02A135EC02912188679 /* ExportCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75687BB4CF8220F5B8FC3551 /* ExportCoordinator.swift */; };
 		92BA69E569DF6E031021035D /* AnnotationModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BED948F29AE6FF994F0B4A3A /* AnnotationModel.swift */; };
@@ -102,7 +102,6 @@
 		601AFF2220AF62F912731742 /* AudioSyncEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioSyncEngine.swift; sourceTree = "<group>"; };
 		6380205E5DE7FB1904B715B3 /* ExportPlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportPlan.swift; sourceTree = "<group>"; };
 		67B4833D4AEB1C54181B78FC /* ImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportView.swift; sourceTree = "<group>"; };
-		68D54D077EAC1686114A6DAF /* AnnotationCompositor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationCompositor.swift; sourceTree = "<group>"; };
 		6D3BF7B072CCC0B9693CFCF6 /* HoldPlaybackCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HoldPlaybackCoordinator.swift; sourceTree = "<group>"; };
 		75687BB4CF8220F5B8FC3551 /* ExportCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportCoordinator.swift; sourceTree = "<group>"; };
 		77156C7733C0AB696540D574 /* CoreoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreoApp.swift; sourceTree = "<group>"; };
@@ -111,6 +110,7 @@
 		848F2882E6ABE131985BA616 /* SpeedControlView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedControlView.swift; sourceTree = "<group>"; };
 		8584ED4DB950FB1D529DD1B2 /* DocumentPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentPickerView.swift; sourceTree = "<group>"; };
 		8A301A071F44CBD5AEC1FD92 /* ModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelTests.swift; sourceTree = "<group>"; };
+		8AD2AD840D5DB2FD87D0B0F2 /* AnnotationRasterizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationRasterizer.swift; sourceTree = "<group>"; };
 		8CABA3689CE1CD52ADA89951 /* ExportProgressView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportProgressView.swift; sourceTree = "<group>"; };
 		90718819F8E6772FBCEE7DF7 /* TextAnnotationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextAnnotationView.swift; sourceTree = "<group>"; };
 		967070AE92BF269CB742DE76 /* TimeMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeMapper.swift; sourceTree = "<group>"; };
@@ -245,6 +245,7 @@
 				204A2916A871BFC20003B3EF /* AnnotationMarkerView.swift */,
 				BED948F29AE6FF994F0B4A3A /* AnnotationModel.swift */,
 				0A7CC39B4F38C14EC537FAA0 /* AnnotationOverlayView.swift */,
+				8AD2AD840D5DB2FD87D0B0F2 /* AnnotationRasterizer.swift */,
 				10B7A50CD67FB317E0A368EA /* AnnotationTimeRangeControl.swift */,
 				FD3BC9669CA59FFAF4E59395 /* AnnotationToolbar.swift */,
 				A27504774982A729418B34BE /* ArrowAnnotationView.swift */,
@@ -329,7 +330,6 @@
 		E50072EC7E6A6C082CFBE06E /* Export */ = {
 			isa = PBXGroup;
 			children = (
-				68D54D077EAC1686114A6DAF /* AnnotationCompositor.swift */,
 				9E31A7AA8C8E9D9C6DEBEE12 /* EndBumperGenerator.swift */,
 				E2412335955689EC824A5176 /* ExportEngine.swift */,
 				6380205E5DE7FB1904B715B3 /* ExportPlan.swift */,
@@ -442,10 +442,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				8A64B0C33D0259F54852A629 /* AnnotationCompositor.swift in Sources */,
 				9CC23C6B3A3686085BF2BD34 /* AnnotationMarkerView.swift in Sources */,
 				92BA69E569DF6E031021035D /* AnnotationModel.swift in Sources */,
 				56298196B45A1871D73E4473 /* AnnotationOverlayView.swift in Sources */,
+				0FEFECE0CD54AF821C38887E /* AnnotationRasterizer.swift in Sources */,
 				6280CB77CCC1184E7E2E59E5 /* AnnotationStore.swift in Sources */,
 				BE179B6B66A6B234E0D08E4D /* AnnotationTimeRangeControl.swift in Sources */,
 				16E4C26022BB6A2ABE8910AC /* AnnotationToolbar.swift in Sources */,

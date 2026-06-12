@@ -74,7 +74,7 @@ struct AnnotationTimeRangeControl: View {
                         .foregroundColor(.white.opacity(0.8))
                 }
                 .toggleStyle(CompactToggleStyle())
-                .onChange(of: isPersistent) { newValue in
+                .onChange(of: isPersistent) { _, newValue in
                     if newValue {
                         startTimeSeconds = timelineStart
                         durationSeconds = timelineDuration
@@ -102,7 +102,6 @@ struct AnnotationTimeRangeControl: View {
     /// The horizontal bar showing the full timeline with a highlighted annotation range.
     ///
     /// - Parameter width: Available width for the bar.
-    @ViewBuilder
     private func rangeBar(width: CGFloat) -> some View {
         ZStack(alignment: .leading) {
             // Full timeline track
@@ -164,7 +163,6 @@ struct AnnotationTimeRangeControl: View {
     ///
     /// - Parameter x: The x-offset for the handle.
     /// - Returns: A styled circle view positioned at the given offset.
-    @ViewBuilder
     private func handleCircle(at x: CGFloat) -> some View {
         Circle()
             .fill(Color.white)

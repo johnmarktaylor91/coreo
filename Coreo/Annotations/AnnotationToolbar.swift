@@ -21,20 +21,20 @@ enum AnnotationTool: String, CaseIterable {
     /// The SF Symbol name for this tool's icon.
     var iconName: String {
         switch self {
-        case .pencil: return "pencil.tip"
-        case .text: return "textformat"
-        case .arrow: return "arrow.up.right"
-        case .eraser: return "eraser"
+        case .pencil: "pencil.tip"
+        case .text: "textformat"
+        case .arrow: "arrow.up.right"
+        case .eraser: "eraser"
         }
     }
 
     /// A human-readable label for accessibility.
     var label: String {
         switch self {
-        case .pencil: return "Pencil"
-        case .text: return "Text"
-        case .arrow: return "Arrow"
-        case .eraser: return "Eraser"
+        case .pencil: "Pencil"
+        case .text: "Text"
+        case .arrow: "Arrow"
+        case .eraser: "Eraser"
         }
     }
 }
@@ -100,6 +100,7 @@ struct AnnotationToolbar: View {
 
         Button {
             selectedTool = tool
+            viewModel.enterAnnotationMode(tool: tool)
         } label: {
             VStack(spacing: 2) {
                 Image(systemName: tool.iconName)
