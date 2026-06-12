@@ -70,30 +70,27 @@ enum PersonDetector {
         imageGenerator.maximumSize = CGSize(width: 1280, height: 1280)
         imageGenerator.requestedTimeToleranceBefore = CMTime(seconds: 0.5, preferredTimescale: 600)
         imageGenerator.requestedTimeToleranceAfter = CMTime(seconds: 0.5, preferredTimescale: 600)
+        let cmTimes = sampleTimes.map {
+            CMTime(seconds: $0, preferredTimescale: 600)
+        }
 
         // Run detection on a background thread.
         return try await Task.detached(priority: .userInitiated) {
             var allRects: [CGRect] = []
+            let request = makeHumanRectanglesRequest()
 
-            for sampleTime in sampleTimes {
+            for await result in imageGenerator.images(for: cmTimes) {
                 try Task.checkCancellation()
 
-                let cmTime = CMTime(seconds: sampleTime, preferredTimescale: 600)
-
-                // autoreleasepool ensures each CGImage (~6MB at 1280px) is
-                // released before the next frame is generated.
-                let rects: [CGRect] = try autoreleasepool {
-                    let cgImage: CGImage
-                    do {
-                        var actualTime = CMTime.zero
-                        cgImage = try imageGenerator.copyCGImage(at: cmTime, actualTime: &actualTime)
-                    } catch {
-                        return []
+                switch result {
+                case let .success(_, image, _):
+                    let rects: [CGRect] = try autoreleasepool {
+                        try detectHumans(in: image, request: request)
                     }
-
-                    return try detectHumans(in: cgImage)
+                    allRects.append(contentsOf: rects)
+                case .failure:
+                    continue
                 }
-                allRects.append(contentsOf: rects)
             }
 
             return allRects
@@ -122,11 +119,11 @@ enum PersonDetector {
 
     /// Run VNDetectHumanRectanglesRequest on a single CGImage.
     ///
-    /// - Parameter image: The frame to analyze.
+    /// - Parameters:
+    ///   - image: The frame to analyze.
+    ///   - request: Reusable Vision request.
     /// - Returns: Bounding boxes of detected humans in Vision coordinates.
-    private static func detectHumans(in image: CGImage) throws -> [CGRect] {
-        let request = VNDetectHumanRectanglesRequest()
-
+    private static func detectHumans(in image: CGImage, request: VNDetectHumanRectanglesRequest) throws -> [CGRect] {
         let handler = VNImageRequestHandler(cgImage: image, options: [:])
         try handler.perform([request])
 
@@ -135,5 +132,14 @@ enum PersonDetector {
         }
 
         return observations.map(\.boundingBox)
+    }
+
+    /// Builds a full-body human rectangle request for dance framing.
+    ///
+    /// - Returns: Vision request configured to include legs and feet.
+    private static func makeHumanRectanglesRequest() -> VNDetectHumanRectanglesRequest {
+        let request = VNDetectHumanRectanglesRequest()
+        request.upperBodyOnly = false
+        return request
     }
 }

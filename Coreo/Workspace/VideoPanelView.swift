@@ -20,6 +20,12 @@ struct VideoPanelView: View {
     /// Optional normalized (0-1) crop region. Nil means show the full frame.
     let cropRect: CGRect?
 
+    /// Whether the preview should be flipped horizontally.
+    let isMirrored: Bool
+
+    /// Whether this panel's audio is currently muted.
+    let isMuted: Bool
+
     /// Whether this video has content at the current playhead position.
     let isActive: Bool
 
@@ -31,6 +37,12 @@ struct VideoPanelView: View {
 
     /// Called when the user nudges sync by a delta.
     let onNudgeSync: (Double) -> Void
+
+    /// Called when the user toggles this panel's audio.
+    let onToggleMute: () -> Void
+
+    /// Called when the user toggles this panel's mirror mode.
+    let onToggleMirror: () -> Void
 
     /// Accumulated pinch-to-zoom scale.
     @State private var currentScale: CGFloat = 1.0
@@ -48,7 +60,7 @@ struct VideoPanelView: View {
         GeometryReader { _ in
             ZStack {
                 // Video layer — always present so AVPlayer keeps its attachment.
-                AVPlayerLayerView(player: player, cropRect: cropRect)
+                AVPlayerLayerView(player: player, cropRect: cropRect, isMirrored: isMirrored)
                     .scaleEffect(currentScale * gestureScale)
                     .offset(
                         x: panOffset.width + gestureDragOffset.width,
@@ -71,6 +83,7 @@ struct VideoPanelView: View {
                     HStack {
                         syncStatusBadge
                         Spacer()
+                        panelUtilityControls
                         syncNudgeControls
                     }
                     Spacer()
@@ -114,6 +127,54 @@ struct VideoPanelView: View {
             syncNudgeButton(label: "-.1", delta: -0.1)
             syncNudgeButton(label: "+.1", delta: 0.1)
         }
+    }
+
+    /// Mirror and audio buttons for one panel.
+    private var panelUtilityControls: some View {
+        HStack(spacing: 4) {
+            panelIconButton(
+                systemName: isMirrored ? "arrow.left.and.right.righttriangle.left.righttriangle.right.fill" : "arrow.left.and.right",
+                label: isMirrored ? "Disable mirror mode" : "Enable mirror mode",
+                isActive: isMirrored,
+                action: onToggleMirror
+            )
+            panelIconButton(
+                systemName: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
+                label: isMuted ? "Unmute angle audio" : "Mute angle audio",
+                isActive: !isMuted,
+                action: onToggleMute
+            )
+        }
+    }
+
+    /// Builds one icon-only utility button.
+    ///
+    /// - Parameters:
+    ///   - systemName: SF Symbol name.
+    ///   - label: Accessibility label.
+    ///   - isActive: Whether the button represents active state.
+    ///   - action: Button action.
+    /// - Returns: A utility button view.
+    private func panelIconButton(
+        systemName: String,
+        label: String,
+        isActive: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button {
+            Haptic.tick()
+            action()
+        } label: {
+            Image(systemName: systemName)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(isActive ? CoreoColor.accent : .white.opacity(0.82))
+                .frame(width: 44, height: 44)
+                .background(Color.black.opacity(0.45))
+                .clipShape(RoundedRectangle(cornerRadius: 4))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
     }
 
     /// Builds one sync nudge button.
@@ -197,14 +258,17 @@ struct AVPlayerLayerView: UIViewRepresentable {
     /// The player to render.
     let player: AVPlayer
 
-    /// Optional normalized crop rect. When set, a CALayer mask is applied
-    /// to show only the specified region of the video frame.
+    /// Optional normalized crop rect. When set, the player layer displays
+    /// the same source region that export crops.
     let cropRect: CGRect?
+
+    /// Whether the layer should be flipped horizontally.
+    let isMirrored: Bool
 
     func makeUIView(context _: Context) -> PlayerUIView {
         let view = PlayerUIView()
         view.playerLayer.player = player
-        view.playerLayer.videoGravity = cropRect != nil ? .resizeAspectFill : .resizeAspect
+        view.playerLayer.videoGravity = .resizeAspect
         view.backgroundColor = .clear
         return view
     }
@@ -215,13 +279,12 @@ struct AVPlayerLayerView: UIViewRepresentable {
             uiView.playerLayer.player = player
         }
 
-        // Update gravity based on crop presence.
-        let gravity: AVLayerVideoGravity = cropRect != nil ? .resizeAspectFill : .resizeAspect
-        if uiView.playerLayer.videoGravity != gravity {
-            uiView.playerLayer.videoGravity = gravity
+        if uiView.playerLayer.videoGravity != .resizeAspect {
+            uiView.playerLayer.videoGravity = .resizeAspect
         }
 
         uiView.cropRect = cropRect
+        uiView.isMirrored = isMirrored
     }
 }
 
@@ -230,24 +293,26 @@ struct AVPlayerLayerView: UIViewRepresentable {
 /// A UIView subclass whose layer class is AVPlayerLayer, giving us direct
 /// control over video rendering without an extra sublayer.
 final class PlayerUIView: UIView {
-    /// Reused crop mask layer.
-    private let cropMaskLayer = CAShapeLayer()
-
-    /// Last bounds used to build the crop mask path.
-    private var lastMaskBounds: CGRect = .null
-
-    /// Last crop rect used to build the crop mask path.
-    private var lastMaskCropRect: CGRect?
+    /// Last layer contents rect applied.
+    private var lastContentsRect: CGRect = .null
 
     /// Optional normalized crop rect.
     var cropRect: CGRect? {
         didSet {
             guard cropRect != oldValue else { return }
-            setNeedsLayout()
+            updateLayerGeometryIfNeeded()
         }
     }
 
-    override class var layerClass: AnyClass {
+    /// Whether this layer should be flipped horizontally.
+    var isMirrored: Bool = false {
+        didSet {
+            guard isMirrored != oldValue else { return }
+            updateLayerGeometryIfNeeded()
+        }
+    }
+
+    override static var layerClass: AnyClass {
         AVPlayerLayer.self
     }
 
@@ -258,33 +323,13 @@ final class PlayerUIView: UIView {
         layer as! AVPlayerLayer
     }
 
-    /// Updates the crop mask after layout changes.
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        updateCropMaskIfNeeded()
-    }
-
-    /// Applies or removes the reusable crop mask.
-    private func updateCropMaskIfNeeded() {
-        guard let cropRect else {
-            layer.mask = nil
-            lastMaskCropRect = nil
-            lastMaskBounds = .null
-            return
+    /// Applies crop and mirror geometry only when needed.
+    private func updateLayerGeometryIfNeeded() {
+        let contentsRect = CropGeometry.previewContentsRect(for: cropRect)
+        if contentsRect != lastContentsRect {
+            playerLayer.contentsRect = contentsRect
+            lastContentsRect = contentsRect
         }
-
-        guard bounds.width > 0, bounds.height > 0 else { return }
-        guard cropRect != lastMaskCropRect || bounds != lastMaskBounds else { return }
-
-        let maskFrame = CGRect(
-            x: cropRect.origin.x * bounds.width,
-            y: cropRect.origin.y * bounds.height,
-            width: cropRect.size.width * bounds.width,
-            height: cropRect.size.height * bounds.height
-        )
-        cropMaskLayer.path = UIBezierPath(rect: maskFrame).cgPath
-        layer.mask = cropMaskLayer
-        lastMaskCropRect = cropRect
-        lastMaskBounds = bounds
+        playerLayer.setAffineTransform(isMirrored ? CGAffineTransform(scaleX: -1, y: 1) : .identity)
     }
 }

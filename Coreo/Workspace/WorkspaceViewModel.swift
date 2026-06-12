@@ -43,6 +43,9 @@ final class WorkspaceViewModel {
     /// Whether speed control editing is visible.
     var isSpeedControlVisible: Bool = false
 
+    /// Video IDs currently allowed to play audio in preview.
+    var unmutedVideoIDs: Set<UUID>
+
     /// The project store used for media URL resolution and autosave.
     private let projectStore: ProjectStore
 
@@ -97,6 +100,7 @@ final class WorkspaceViewModel {
         self.projectStore = projectStore
         annotations = AnnotationStore(annotations: project.annotations)
         export = ExportCoordinator()
+        unmutedVideoIDs = Set(project.audioSourceVideoID.map { [$0] } ?? [])
         playback = PlaybackController(
             project: project,
             projectStore: projectStore,
@@ -143,7 +147,46 @@ final class WorkspaceViewModel {
     func setAudioSource(index: Int) {
         guard index >= 0, index < playback.players.count else { return }
         project.audioSourceIndex = index
+        unmutedVideoIDs = [project.videos[index].id]
         playback.setAudioSource(index: index)
+    }
+
+    /// Toggles whether one panel's audio is muted in preview.
+    ///
+    /// - Parameter index: Video display index.
+    func togglePanelMute(index: Int) {
+        guard project.videos.indices.contains(index) else { return }
+        let id = project.videos[index].id
+        if unmutedVideoIDs.contains(id) {
+            unmutedVideoIDs.remove(id)
+        } else {
+            unmutedVideoIDs.insert(id)
+        }
+        playback.setUnmutedVideoIDs(unmutedVideoIDs)
+    }
+
+    /// Returns whether a panel is currently muted.
+    ///
+    /// - Parameter index: Video display index.
+    /// - Returns: True when the panel's audio is muted.
+    func isPanelMuted(index: Int) -> Bool {
+        guard project.videos.indices.contains(index) else { return true }
+        return !unmutedVideoIDs.contains(project.videos[index].id)
+    }
+
+    /// Toggles preview mirror mode for a panel and persists it on the video asset.
+    ///
+    /// - Parameter index: Video display index.
+    func toggleMirror(index: Int) {
+        guard project.videos.indices.contains(index) else { return }
+        project.videos[index].isMirrored.toggle()
+    }
+
+    /// Steps the master playhead by one frame.
+    ///
+    /// - Parameter direction: -1 for backward, +1 for forward.
+    func stepFrame(direction: Int) {
+        playback.stepFrames(direction < 0 ? -1 : 1)
     }
 
     /// Enters annotation mode: pauses playback and shows the drawing overlay.

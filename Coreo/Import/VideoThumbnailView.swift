@@ -71,17 +71,20 @@ struct VideoThumbnailView: View {
             Haptic.light()
             onRemove()
         } label: {
-            Image(systemName: "xmark")
-                .font(.system(size: 9, weight: .bold))
-                .foregroundColor(.white)
-                .frame(width: 20, height: 20)
-                .background(Color.black.opacity(0.6))
-                .clipShape(Circle())
+            ZStack {
+                Circle()
+                    .fill(Color.black.opacity(0.6))
+                    .frame(width: 20, height: 20)
+                Image(systemName: "xmark")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundColor(.white)
+            }
+            .frame(width: 44, height: 44)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.coreoToolbar)
-        .frame(width: 44, height: 44)
-        .contentShape(Rectangle())
         .offset(x: 12, y: -12)
+        .accessibilityLabel("Remove \(video.originalFilename)")
     }
 
     // MARK: - Layout

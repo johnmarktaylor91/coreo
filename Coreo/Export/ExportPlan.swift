@@ -158,12 +158,7 @@ struct ExportPlan {
     ///   - extent: Current image extent.
     /// - Returns: Crop rectangle in CIImage coordinates.
     static func ciCropRect(for cropRect: CGRect, extent: CGRect) -> CGRect {
-        CGRect(
-            x: extent.origin.x + cropRect.minX * extent.width,
-            y: extent.origin.y + (1 - cropRect.maxY) * extent.height,
-            width: cropRect.width * extent.width,
-            height: cropRect.height * extent.height
-        )
+        CropGeometry.ciCropRect(for: cropRect, extent: extent) ?? extent
     }
 
     /// Computes the aspect-fit placement for content inside a panel.

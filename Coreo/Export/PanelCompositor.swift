@@ -178,11 +178,8 @@ final class PanelCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
             image = image.oriented(orientation)
 
             // Image extent is now in display orientation (y-up, CIImage coords).
-            if let cropRect = config.cropRect {
-                image = image.cropped(to: ExportPlan.ciCropRect(
-                    for: cropRect,
-                    extent: image.extent
-                ))
+            if let cropRect = CropGeometry.ciCropRect(for: config.cropRect, extent: image.extent) {
+                image = image.cropped(to: cropRect)
             }
 
             let extent = image.extent

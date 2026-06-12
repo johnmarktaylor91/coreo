@@ -29,10 +29,10 @@ struct VideoGridView: View {
             // Dark background visible in the gaps between panels.
             Color(red: 0.1, green: 0.1, blue: 0.1)
 
-            ForEach(Array(viewModel.project.videos.enumerated()), id: \.element.id) { index, _ in
+            ForEach(Array(viewModel.project.videos.enumerated()), id: \.element.id) { index, video in
                 if index < rects.count, index < playback.players.count {
                     let rect = rects[index]
-                    let cropRect = viewModel.project.videos[index].effectiveCropRect
+                    let cropRect = video.effectiveCropRect
 
                     ActiveVideoPanelView(
                         viewModel: viewModel,
@@ -40,9 +40,17 @@ struct VideoGridView: View {
                         player: playback.players[index],
                         index: index,
                         cropRect: cropRect,
+                        isMirrored: video.isMirrored,
+                        isMuted: viewModel.isPanelMuted(index: index),
                         syncStatusLabel: viewModel.syncStatusLabel(for: index),
                         onNudgeSync: { delta in
                             viewModel.nudgeSyncOffset(index: index, deltaSeconds: delta)
+                        },
+                        onToggleMute: {
+                            viewModel.togglePanelMute(index: index)
+                        },
+                        onToggleMirror: {
+                            viewModel.toggleMirror(index: index)
                         }
                     )
                     .frame(width: rect.width, height: rect.height)
@@ -74,21 +82,37 @@ private struct ActiveVideoPanelView: View {
     /// Effective crop rectangle for the video.
     let cropRect: CGRect?
 
+    /// Whether this angle is mirrored in preview.
+    let isMirrored: Bool
+
+    /// Whether this angle's preview audio is muted.
+    let isMuted: Bool
+
     /// Compact sync status label.
     let syncStatusLabel: String
 
     /// Sync nudge callback.
     let onNudgeSync: (Double) -> Void
 
+    /// Toggle panel mute callback.
+    let onToggleMute: () -> Void
+
+    /// Toggle panel mirror callback.
+    let onToggleMirror: () -> Void
+
     var body: some View {
         let currentTimeSeconds = playback.currentTimeSeconds
         VideoPanelView(
             player: player,
             cropRect: cropRect,
+            isMirrored: isMirrored,
+            isMuted: isMuted,
             isActive: viewModel.isVideoActive(index: index, at: currentTimeSeconds),
             inactiveLabel: viewModel.inactiveLabel(forIndex: index, at: currentTimeSeconds),
             syncStatusLabel: syncStatusLabel,
-            onNudgeSync: onNudgeSync
+            onNudgeSync: onNudgeSync,
+            onToggleMute: onToggleMute,
+            onToggleMirror: onToggleMirror
         )
     }
 }

@@ -40,7 +40,29 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(decoded.syncOffsetSeconds, -2, accuracy: 0.001)
         XCTAssertEqual(decoded.syncStatus, .noAudio)
         XCTAssertEqual(decoded.autoCropRect, original.autoCropRect)
+        XCTAssertFalse(decoded.isMirrored)
         XCTAssertEqual(decoded.durationSeconds, original.durationSeconds, accuracy: 0.001)
+    }
+
+    func testVideoAssetDecodesLegacyPayloadWithoutMirrorFlag() throws {
+        let legacyJSON = """
+        {
+          "id": "\(UUID().uuidString)",
+          "relativePath": "media/legacy.mp4",
+          "originalFilename": "legacy.mp4",
+          "durationSeconds": 12,
+          "dimensions": [1920, 1080],
+          "audioBitrate": 128000,
+          "audioSampleRate": 48000,
+          "thumbnailData": null
+        }
+        """
+
+        let decoded = try JSONDecoder().decode(VideoAsset.self, from: Data(legacyJSON.utf8))
+
+        XCTAssertFalse(decoded.isMirrored)
+        XCTAssertEqual(decoded.syncOffsetSeconds, 0)
+        XCTAssertEqual(decoded.syncStatus, .synced)
     }
 
     func testVideoAssetFormattedDuration() {

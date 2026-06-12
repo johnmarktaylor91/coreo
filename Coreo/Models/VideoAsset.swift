@@ -76,6 +76,9 @@ struct VideoAsset: Codable, Identifiable {
     /// Optional normalized manual crop rectangle.
     var manualCropRect: CGRect?
 
+    /// Whether preview should horizontally mirror this angle.
+    var isMirrored: Bool
+
     /// Optional normalized manual layout override for this panel.
     var panelRectOverride: CGRect?
 
@@ -107,6 +110,7 @@ struct VideoAsset: Codable, Identifiable {
         syncStatus: SyncStatus = .synced,
         autoCropRect: CGRect? = nil,
         manualCropRect: CGRect? = nil,
+        isMirrored: Bool = false,
         panelRectOverride: CGRect? = nil,
         trimStartSeconds: Double? = nil,
         trimDurationSeconds: Double? = nil,
@@ -125,11 +129,61 @@ struct VideoAsset: Codable, Identifiable {
         self.syncStatus = syncStatus
         self.autoCropRect = autoCropRect
         self.manualCropRect = manualCropRect
+        self.isMirrored = isMirrored
         self.panelRectOverride = panelRectOverride
         self.trimStartSeconds = trimStartSeconds
         self.trimDurationSeconds = trimDurationSeconds
         self.annotationCanvasSize = annotationCanvasSize
         self.mediaAvailability = mediaAvailability
+    }
+
+    /// Coding keys with decode defaults for additive model fields.
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case relativePath
+        case originalFilename
+        case durationSeconds
+        case dimensions
+        case audioBitrate
+        case audioSampleRate
+        case thumbnailData
+        case syncOffsetSeconds
+        case syncStatus
+        case autoCropRect
+        case manualCropRect
+        case isMirrored
+        case panelRectOverride
+        case trimStartSeconds
+        case trimDurationSeconds
+        case annotationCanvasSize
+        case mediaAvailability
+    }
+
+    /// Decodes a video asset, defaulting additive optional state for older project files.
+    ///
+    /// - Parameter decoder: Decoder containing a persisted video asset.
+    /// - Throws: Decoding errors for required media metadata.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        relativePath = try container.decode(String.self, forKey: .relativePath)
+        originalFilename = try container.decodeIfPresent(String.self, forKey: .originalFilename)
+            ?? URL(fileURLWithPath: relativePath).lastPathComponent
+        durationSeconds = try container.decode(Double.self, forKey: .durationSeconds)
+        dimensions = try container.decode(CGSize.self, forKey: .dimensions)
+        audioBitrate = try container.decode(Int.self, forKey: .audioBitrate)
+        audioSampleRate = try container.decode(Int.self, forKey: .audioSampleRate)
+        thumbnailData = try container.decodeIfPresent(Data.self, forKey: .thumbnailData)
+        syncOffsetSeconds = try container.decodeIfPresent(TimeInterval.self, forKey: .syncOffsetSeconds) ?? 0
+        syncStatus = try container.decodeIfPresent(SyncStatus.self, forKey: .syncStatus) ?? .synced
+        autoCropRect = try container.decodeIfPresent(CGRect.self, forKey: .autoCropRect)
+        manualCropRect = try container.decodeIfPresent(CGRect.self, forKey: .manualCropRect)
+        isMirrored = try container.decodeIfPresent(Bool.self, forKey: .isMirrored) ?? false
+        panelRectOverride = try container.decodeIfPresent(CGRect.self, forKey: .panelRectOverride)
+        trimStartSeconds = try container.decodeIfPresent(Double.self, forKey: .trimStartSeconds)
+        trimDurationSeconds = try container.decodeIfPresent(Double.self, forKey: .trimDurationSeconds)
+        annotationCanvasSize = try container.decodeIfPresent(CGSize.self, forKey: .annotationCanvasSize)
+        mediaAvailability = try container.decodeIfPresent(MediaAvailability.self, forKey: .mediaAvailability) ?? .available
     }
 
     // MARK: - Computed Properties

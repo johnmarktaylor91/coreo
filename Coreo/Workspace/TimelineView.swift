@@ -24,7 +24,7 @@ struct TimelineView: View {
     let playback: PlaybackController
 
     /// Total height of the timeline bar.
-    let height: CGFloat = 80
+    let height: CGFloat = 112
 
     /// Whether the user is currently dragging the playhead.
     @State private var isDragging: Bool = false
@@ -78,11 +78,12 @@ struct TimelineView: View {
                         timelineStart: timelineStart,
                         timelineDuration: timelineDuration,
                         onTapAnnotation: { annotation in
+                            Haptic.tick()
                             viewModel.seek(to: annotation.startTimeSeconds)
                             viewModel.enterAnnotationMode()
                         }
                     )
-                    .frame(height: 12)
+                    .frame(height: 44)
                 }
                 .padding(.horizontal, 8)
 
@@ -92,6 +93,12 @@ struct TimelineView: View {
             .gesture(scrubDragGesture(width: width))
         }
         .frame(height: height)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Timeline")
+        .accessibilityValue(
+            "\(TimeFormatting.formatShort(playback.currentTimeSeconds - timelineStart)) of "
+                + "\(TimeFormatting.formatShort(timelineDuration))"
+        )
     }
 
     // MARK: - Timeline Math

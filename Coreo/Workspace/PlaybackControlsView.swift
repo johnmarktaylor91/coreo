@@ -22,9 +22,13 @@ struct PlaybackControlsView: View {
             timeDisplay
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            // MARK: Center — Play/Pause
+            // MARK: Center — Frame Step + Play/Pause
 
-            playPauseButton
+            HStack(spacing: Spacing.sm) {
+                frameStepButton(direction: -1)
+                playPauseButton
+                frameStepButton(direction: 1)
+            }
 
             // MARK: Right — Speed Picker
 
@@ -64,6 +68,26 @@ struct PlaybackControlsView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.coreoToolbar)
+        .accessibilityLabel(playback.isPlaying ? "Pause" : "Play")
+    }
+
+    /// One-frame step button.
+    ///
+    /// - Parameter direction: -1 for backward, +1 for forward.
+    /// - Returns: A frame-step button.
+    private func frameStepButton(direction: Int) -> some View {
+        Button {
+            Haptic.tick()
+            viewModel.stepFrame(direction: direction)
+        } label: {
+            Image(systemName: direction < 0 ? "backward.frame.fill" : "forward.frame.fill")
+                .font(.body.weight(.semibold))
+                .foregroundColor(.white.opacity(0.82))
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.coreoToolbar)
+        .accessibilityLabel(direction < 0 ? "Step back one frame" : "Step forward one frame")
     }
 
     // MARK: - Speed Picker
@@ -90,6 +114,7 @@ struct PlaybackControlsView: View {
                 )
         }
         .buttonStyle(.coreo)
+        .accessibilityLabel("Playback speed \(speedLabel)")
         .popover(isPresented: $bindablePlayback.isSpeedPickerVisible) {
             speedPickerContent
                 .frame(width: 260, height: 52)

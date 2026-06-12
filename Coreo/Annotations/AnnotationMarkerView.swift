@@ -24,13 +24,16 @@ struct AnnotationMarkerView: View {
     let timelineDuration: Double
 
     /// The height of the marker row.
-    let height: CGFloat = 12
+    let height: CGFloat = 44
 
     /// Called when the user taps an annotation marker.
     let onTapAnnotation: (TimedAnnotation) -> Void
 
     /// Diameter of each marker dot.
-    private let markerDiameter: CGFloat = 6
+    private let markerDiameter: CGFloat = 28
+
+    /// Effective touch target for each marker.
+    private let hitTarget: CGFloat = 44
 
     var body: some View {
         GeometryReader { geometry in
@@ -43,14 +46,20 @@ struct AnnotationMarkerView: View {
                     let x = xPosition(for: annotation.startTimeSeconds, in: width)
                     let color = markerColor(for: annotation)
 
-                    Circle()
-                        .fill(color)
-                        .frame(width: markerDiameter, height: markerDiameter)
-                        .shadow(color: color.opacity(0.5), radius: 2, x: 0, y: 0)
-                        .position(x: x, y: height / 2)
-                        .onTapGesture {
-                            onTapAnnotation(annotation)
-                        }
+                    Button {
+                        onTapAnnotation(annotation)
+                    } label: {
+                        Circle()
+                            .fill(color)
+                            .frame(width: markerDiameter, height: markerDiameter)
+                            .shadow(color: color.opacity(0.5), radius: 2, x: 0, y: 0)
+                            .frame(width: hitTarget, height: hitTarget)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .position(x: x, y: height / 2)
+                    .accessibilityLabel("Annotation marker")
+                    .accessibilityValue(TimeFormatting.formatShort(annotation.startTimeSeconds - timelineStart))
                 }
             }
         }

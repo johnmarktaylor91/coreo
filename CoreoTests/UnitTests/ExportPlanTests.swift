@@ -53,6 +53,20 @@ final class ExportPlanTests: XCTestCase {
         XCTAssertEqual(placement.offset.y, 0, accuracy: 0.0001)
     }
 
+    func testCropGeometryMapsPreviewAndExportFromSameNormalizedRect() throws {
+        let crop = CGRect(x: 0.25, y: 0.1, width: 0.5, height: 0.8)
+        let extent = CGRect(x: 0, y: 0, width: 2000, height: 1000)
+
+        let previewRect = CropGeometry.previewContentsRect(for: crop)
+        let ciRect = try XCTUnwrap(CropGeometry.ciCropRect(for: crop, extent: extent))
+
+        XCTAssertEqual(previewRect, crop)
+        XCTAssertEqual(ciRect.origin.x, 500, accuracy: 0.000_001)
+        XCTAssertEqual(ciRect.origin.y, 100, accuracy: 0.000_001)
+        XCTAssertEqual(ciRect.width, 1000, accuracy: 0.000_001)
+        XCTAssertEqual(ciRect.height, 800, accuracy: 0.000_001)
+    }
+
     func testGapScalesFromPreviewReferenceWidth() throws {
         let project = makeProject(count: 2, offsets: [0, 0])
         let plan = try ExportPlan(

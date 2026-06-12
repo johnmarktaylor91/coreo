@@ -13,6 +13,7 @@ import SwiftUI
 struct WorkspaceView: View {
     @State private var viewModel: WorkspaceViewModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Coral accent used for interactive elements.
     private let accentCoral = Color(red: 1.0, green: 0.42, blue: 0.21)
@@ -90,8 +91,8 @@ struct WorkspaceView: View {
         .background(bgColor.ignoresSafeArea())
         .navigationBarBackButtonHidden(true)
         .statusBarHidden(viewModel.playback.isPlaying && !viewModel.isEditToolsVisible)
-        .animation(.easeInOut(duration: 0.25), value: viewModel.isEditToolsVisible)
-        .animation(.easeInOut(duration: 0.25), value: viewModel.isAnnotationMode)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: viewModel.isEditToolsVisible)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: viewModel.isAnnotationMode)
         .overlay {
             if viewModel.export.isExporting {
                 ExportProgressView(
@@ -140,6 +141,7 @@ struct WorkspaceView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.coreoToolbar)
+            .accessibilityLabel("Back")
 
             Spacer()
 
@@ -171,6 +173,7 @@ struct WorkspaceView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.coreoToolbar)
+            .accessibilityLabel(viewModel.isEditToolsVisible ? "Hide edit tools" : "Show edit tools")
 
             // Export
             Button {
@@ -185,6 +188,7 @@ struct WorkspaceView: View {
             }
             .buttonStyle(.coreoToolbar)
             .disabled(viewModel.export.isExporting)
+            .accessibilityLabel("Export")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)

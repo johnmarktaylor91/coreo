@@ -39,6 +39,7 @@
 		871B39EA4B8AC4BBB4A8D07D /* AudioSyncEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 601AFF2220AF62F912731742 /* AudioSyncEngine.swift */; };
 		8872A8A83B47B27015CC73E4 /* HoldPlaybackCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D3BF7B072CCC0B9693CFCF6 /* HoldPlaybackCoordinator.swift */; };
 		8D3278A333338F724ED712B3 /* TimeMapperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A89F0A47A1720B4CBB0E639D /* TimeMapperTests.swift */; };
+		8E7E218E5D5B1D4BA648B372 /* CropGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB276728019E48AD1B619235 /* CropGeometry.swift */; };
 		90ACD02A135EC02912188679 /* ExportCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75687BB4CF8220F5B8FC3551 /* ExportCoordinator.swift */; };
 		92BA69E569DF6E031021035D /* AnnotationModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BED948F29AE6FF994F0B4A3A /* AnnotationModel.swift */; };
 		9554A3BA9356CA081B450B95 /* AudioExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 075B7749F6E89720F392BF19 /* AudioExtractor.swift */; };
@@ -136,6 +137,7 @@
 		D7427923A6B67371B8FC970A /* TimeFormattingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeFormattingTests.swift; sourceTree = "<group>"; };
 		DA3F56FF03AC7ED3BD5A061E /* SmartCropEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartCropEngine.swift; sourceTree = "<group>"; };
 		DA8718750B9BDC0A9915EA7C /* TimelineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineView.swift; sourceTree = "<group>"; };
+		DB276728019E48AD1B619235 /* CropGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CropGeometry.swift; sourceTree = "<group>"; };
 		DF2297AFDA5A1FE3BE0FD3C8 /* SpeedSegmentModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedSegmentModel.swift; sourceTree = "<group>"; };
 		E2412335955689EC824A5176 /* ExportEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportEngine.swift; sourceTree = "<group>"; };
 		F3590416D6841AF648EAF5F1 /* ImportViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportViewModel.swift; sourceTree = "<group>"; };
@@ -205,6 +207,7 @@
 		58F5E1FF3B49419C9618EAB7 /* Crop */ = {
 			isa = PBXGroup;
 			children = (
+				DB276728019E48AD1B619235 /* CropGeometry.swift */,
 				D500C31358952D2B2B0FAEF4 /* PersonDetector.swift */,
 				DA3F56FF03AC7ED3BD5A061E /* SmartCropEngine.swift */,
 			);
@@ -456,6 +459,7 @@
 				79D0769EBC3E5510C130EC19 /* CoreoApp.swift in Sources */,
 				79F68515F52DE6E991524427 /* CoreoButtonStyle.swift in Sources */,
 				66CDA9BD93FFD419CD5DB230 /* CoreoProject.swift in Sources */,
+				8E7E218E5D5B1D4BA648B372 /* CropGeometry.swift in Sources */,
 				0DBBB0C8973EE59168E7DBAE /* DesignSystem.swift in Sources */,
 				E1BAC1695127FD33A1EFAFEE /* DocumentPickerView.swift in Sources */,
 				FB37156109108E08EEFA14AF /* EndBumperGenerator.swift in Sources */,

@@ -99,6 +99,7 @@ struct AnnotationToolbar: View {
         let isSelected = selectedTool == tool
 
         Button {
+            Haptic.tick()
             selectedTool = tool
             viewModel.enterAnnotationMode(tool: tool)
         } label: {
@@ -113,6 +114,8 @@ struct AnnotationToolbar: View {
                     .fill(isSelected ? accentCoral : Color.clear)
                     .frame(width: 20, height: 2)
             }
+            .frame(width: 44, height: 44)
+            .contentShape(Rectangle())
         }
         .accessibilityLabel(tool.label)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
@@ -133,6 +136,7 @@ struct AnnotationToolbar: View {
     /// A small colored circle that opens the palette popover when tapped.
     private var colorPickerButton: some View {
         Button {
+            Haptic.tick()
             withAnimation(.easeInOut(duration: 0.2)) {
                 showColorPalette.toggle()
             }
@@ -146,6 +150,8 @@ struct AnnotationToolbar: View {
                     .strokeBorder(Color.white.opacity(0.4), lineWidth: 1.5)
                     .frame(width: 24, height: 24)
             }
+            .frame(width: 44, height: 44)
+            .contentShape(Rectangle())
         }
         .overlay(alignment: .bottom) {
             if showColorPalette {
@@ -161,6 +167,7 @@ struct AnnotationToolbar: View {
         HStack(spacing: 8) {
             ForEach(TimedAnnotation.palette, id: \.hex) { entry in
                 Button {
+                    Haptic.tick()
                     selectedColorHex = entry.hex
                     withAnimation(.easeInOut(duration: 0.15)) {
                         showColorPalette = false
@@ -177,6 +184,8 @@ struct AnnotationToolbar: View {
                                 .frame(width: 32, height: 32)
                         }
                     }
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
                 }
                 .accessibilityLabel(entry.name)
             }
@@ -196,13 +205,14 @@ struct AnnotationToolbar: View {
     /// The button that exits annotation mode.
     private var doneButton: some View {
         Button {
+            Haptic.light()
             viewModel.exitAnnotationMode()
         } label: {
             Text("Done")
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundColor(accentCoral)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
         }
         .accessibilityLabel("Exit annotation mode")
     }

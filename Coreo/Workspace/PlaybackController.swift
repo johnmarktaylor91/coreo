@@ -197,6 +197,52 @@ final class PlaybackController {
         }
     }
 
+    /// Applies the current unmuted angle set to players.
+    ///
+    /// - Parameter videoIDs: Video IDs whose panel audio should be audible.
+    func setUnmutedVideoIDs(_ videoIDs: Set<UUID>) {
+        for (index, player) in players.enumerated() where project.videos.indices.contains(index) {
+            player.isMuted = !videoIDs.contains(project.videos[index].id)
+        }
+    }
+
+    /// Moves the playhead by a fixed number of frames using a precise settle seek.
+    ///
+    /// - Parameters:
+    ///   - frames: Number of frames to step, negative for backward.
+    ///   - framesPerSecond: Timeline frame rate used for stepping.
+    func stepFrames(_ frames: Int, framesPerSecond: Double = 30) {
+        let steppedTime = Self.steppedTimelineTime(
+            currentSeconds: currentTimeSeconds,
+            frames: frames,
+            framesPerSecond: framesPerSecond,
+            timelineStart: project.timelineStartSeconds,
+            timelineEnd: project.timelineEndSeconds
+        )
+        seek(to: steppedTime, precise: true)
+    }
+
+    /// Computes frame-step target time clamped to the timeline.
+    ///
+    /// - Parameters:
+    ///   - currentSeconds: Current timeline time.
+    ///   - frames: Frame delta, negative to step backward.
+    ///   - framesPerSecond: Frame rate used for stepping.
+    ///   - timelineStart: Earliest timeline time.
+    ///   - timelineEnd: Latest timeline time.
+    /// - Returns: Clamped target time.
+    nonisolated static func steppedTimelineTime(
+        currentSeconds: Double,
+        frames: Int,
+        framesPerSecond: Double,
+        timelineStart: Double,
+        timelineEnd: Double
+    ) -> Double {
+        guard framesPerSecond > 0 else { return currentSeconds }
+        let deltaSeconds = Double(frames) / framesPerSecond
+        return min(max(currentSeconds + deltaSeconds, timelineStart), timelineEnd)
+    }
+
     /// Whether a video has content at the given timeline position.
     ///
     /// - Parameters:

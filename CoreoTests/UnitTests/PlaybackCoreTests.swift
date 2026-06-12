@@ -114,4 +114,30 @@ final class PlaybackCoreTests: XCTestCase {
         XCTAssertEqual(timeline, 2 + 1 + 1.0 / 30.0, accuracy: 0.000_001)
         XCTAssertEqual(clipTime, 2, accuracy: 0.000_001)
     }
+
+    /// Frame-step math advances by one frame and clamps at timeline bounds.
+    func testFrameStepTimeMathClampsToTimeline() {
+        XCTAssertEqual(
+            PlaybackController.steppedTimelineTime(
+                currentSeconds: 10,
+                frames: 1,
+                framesPerSecond: 30,
+                timelineStart: -2,
+                timelineEnd: 12
+            ),
+            10 + 1.0 / 30.0,
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(
+            PlaybackController.steppedTimelineTime(
+                currentSeconds: -2,
+                frames: -1,
+                framesPerSecond: 30,
+                timelineStart: -2,
+                timelineEnd: 12
+            ),
+            -2,
+            accuracy: 0.000_001
+        )
+    }
 }
