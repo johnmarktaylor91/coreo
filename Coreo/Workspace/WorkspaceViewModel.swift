@@ -13,7 +13,6 @@ import SwiftUI
 /// video playback driven by a single authoritative timeline.
 @MainActor
 final class WorkspaceViewModel: ObservableObject {
-
     // MARK: - Project State
 
     /// The project being viewed/edited. Mutated for settings like audioSourceIndex.
@@ -90,13 +89,19 @@ final class WorkspaceViewModel: ObservableObject {
     // MARK: - Timeline Convenience
 
     /// Earliest point on the timeline (minimum sync offset).
-    var timelineStart: Double { project.timelineStartSeconds }
+    var timelineStart: Double {
+        project.timelineStartSeconds
+    }
 
     /// Latest point on the timeline (maximum video end).
-    var timelineEnd: Double { project.timelineEndSeconds }
+    var timelineEnd: Double {
+        project.timelineEndSeconds
+    }
 
     /// Total span from earliest start to latest end.
-    var timelineDuration: Double { project.timelineDurationSeconds }
+    var timelineDuration: Double {
+        project.timelineDurationSeconds
+    }
 
     // MARK: - Init / Deinit
 
@@ -285,7 +290,7 @@ final class WorkspaceViewModel: ObservableObject {
     /// Updates a text annotation's position (normalized coordinates).
     func updateAnnotationPosition(id: UUID, position: CGPoint) {
         guard let idx = project.annotations.firstIndex(where: { $0.id == id }) else { return }
-        if case .text(var text) = project.annotations[idx].content {
+        if case var .text(text) = project.annotations[idx].content {
             text.position = position
             project.annotations[idx].content = .text(text)
         }
@@ -319,25 +324,38 @@ final class WorkspaceViewModel: ObservableObject {
 
         exportTask = Task {
             do {
+                let resolution = await MainActor.run { self.exportResolution }
                 let url = try await ExportEngine.export(
                     project: project,
-                    resolution: self.exportResolution,
+                    resolution: resolution,
                     progressHandler: { [weak self] progress in
-                        self?.exportProgress = progress
+                        Task { @MainActor in
+                            self?.exportProgress = progress
+                        }
                     }
                 )
+                guard !Task.isCancelled else {
+                    try? FileManager.default.removeItem(at: url)
+                    isExporting = false
+                    exportTask = nil
+                    return
+                }
                 Haptic.success()
                 exportedVideoURL = url
                 isExporting = false
                 showShareSheet = true
+                exportTask = nil
             } catch is CancellationError {
                 isExporting = false
+                exportTask = nil
             } catch let error as ExportError where error == .cancelled {
                 isExporting = false
+                exportTask = nil
             } catch {
                 Haptic.error()
                 exportError = error.localizedDescription
                 isExporting = false
+                exportTask = nil
             }
         }
     }
@@ -346,6 +364,7 @@ final class WorkspaceViewModel: ObservableObject {
     func cancelExport() {
         exportTask?.cancel()
         isExporting = false
+        showShareSheet = false
     }
 
     /// Cleans up the exported temp file. Call after the share sheet is dismissed.
@@ -366,7 +385,8 @@ final class WorkspaceViewModel: ObservableObject {
     /// - Returns: True if the video's local time is within its duration.
     func isVideoActive(index: Int, at timelineSeconds: Double) -> Bool {
         guard index >= 0, index < project.videos.count,
-              index < project.syncOffsets.count else {
+              index < project.syncOffsets.count
+        else {
             return false
         }
         let videoSeconds = timelineSeconds - project.syncOffsets[index]
@@ -381,7 +401,8 @@ final class WorkspaceViewModel: ObservableObject {
     /// - Returns: A label like "Starts in 0:04" or "Ended", or nil if the video is active.
     func inactiveLabel(forIndex index: Int, at timelineSeconds: Double) -> String? {
         guard index >= 0, index < project.videos.count,
-              index < project.syncOffsets.count else {
+              index < project.syncOffsets.count
+        else {
             return nil
         }
         let videoSeconds = timelineSeconds - project.syncOffsets[index]
@@ -436,13 +457,13 @@ final class WorkspaceViewModel: ObservableObject {
             queue: .main
         ) { [weak self] cmTime in
             Task { @MainActor [weak self] in
-                guard let self, self.isPlaying else { return }
+                guard let self, isPlaying else { return }
                 let refSeconds = CMTimeGetSeconds(cmTime)
                 guard refSeconds.isFinite else { return }
-                guard self.validReferenceIndex < self.project.syncOffsets.count else { return }
-                let timelineTime = refSeconds + self.project.syncOffsets[self.validReferenceIndex]
-                self.currentTimeSeconds = timelineTime
-                self.applyLiveSpeedSegment(at: timelineTime)
+                guard validReferenceIndex < project.syncOffsets.count else { return }
+                let timelineTime = refSeconds + project.syncOffsets[validReferenceIndex]
+                currentTimeSeconds = timelineTime
+                applyLiveSpeedSegment(at: timelineTime)
             }
         }
     }
@@ -461,9 +482,9 @@ final class WorkspaceViewModel: ObservableObject {
             .sink { [weak self] _ in
                 Task { @MainActor [weak self] in
                     guard let self else { return }
-                    self.seekAll(to: self.timelineStart)
-                    if self.isPlaying {
-                        self.playAll()
+                    seekAll(to: timelineStart)
+                    if isPlaying {
+                        playAll()
                     }
                 }
             }
@@ -481,10 +502,10 @@ final class WorkspaceViewModel: ObservableObject {
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                self.wasPlayingBeforeBackground = self.isPlaying
-                if self.isPlaying {
-                    self.pauseAll()
-                    self.isPlaying = false
+                wasPlayingBeforeBackground = isPlaying
+                if isPlaying {
+                    pauseAll()
+                    isPlaying = false
                 }
             }
         }
@@ -495,11 +516,11 @@ final class WorkspaceViewModel: ObservableObject {
             queue: .main
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
-                guard let self, self.wasPlayingBeforeBackground else { return }
-                self.wasPlayingBeforeBackground = false
-                self.seekAll(to: self.currentTimeSeconds)
-                self.playAll()
-                self.isPlaying = true
+                guard let self, wasPlayingBeforeBackground else { return }
+                wasPlayingBeforeBackground = false
+                seekAll(to: currentTimeSeconds)
+                playAll()
+                isPlaying = true
             }
         }
     }
@@ -520,10 +541,14 @@ final class WorkspaceViewModel: ObservableObject {
 
             if segmentRate == 0 {
                 // Hold/freeze: pause all players but keep isPlaying true.
-                for player in players { player.pause() }
+                for player in players {
+                    player.pause()
+                }
             } else {
                 let effectiveRate = playbackRate * segmentRate
-                for player in players { player.rate = effectiveRate }
+                for player in players {
+                    player.rate = effectiveRate
+                }
             }
         }
     }
@@ -599,8 +624,8 @@ final class WorkspaceViewModel: ObservableObject {
 private extension ExportError {
     static func == (lhs: ExportError, rhs: ExportError) -> Bool {
         switch (lhs, rhs) {
-        case (.cancelled, .cancelled): return true
-        default: return false
+        case (.cancelled, .cancelled): true
+        default: false
         }
     }
 }

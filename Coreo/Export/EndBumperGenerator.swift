@@ -18,12 +18,12 @@ enum BumperError: Error, LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .writerCreationFailed(let reason):
-            return "Failed to create bumper writer: \(reason)"
+        case let .writerCreationFailed(reason):
+            "Failed to create bumper writer: \(reason)"
         case .pixelBufferFailed:
-            return "Failed to create pixel buffer for bumper frame."
-        case .writingFailed(let reason):
-            return "Bumper writing failed: \(reason)"
+            "Failed to create pixel buffer for bumper frame."
+        case let .writingFailed(reason):
+            "Bumper writing failed: \(reason)"
         }
     }
 }
@@ -34,10 +34,6 @@ enum BumperError: Error, LocalizedError {
 /// rendered in white SF Pro Medium. The text fades in over 0.3s, holds,
 /// then fades out over 0.3s. Output is a silent .mp4 at 30fps.
 enum EndBumperGenerator {
-
-    /// Frames per second for the bumper video.
-    private static let fps: Int32 = 30
-
     /// Total bumper duration in seconds.
     private static let durationSeconds: Double = 1.0
 
@@ -48,6 +44,8 @@ enum EndBumperGenerator {
         blue: 10.0 / 255.0,
         alpha: 1.0
     )
+    private static var cachedBumpers: [String: URL] = [:]
+    private static let cacheLock = NSLock()
 
     // MARK: - Public
 
@@ -61,8 +59,14 @@ enum EndBumperGenerator {
     /// - Returns: URL to the generated bumper .mp4 file.
     /// - Throws: `BumperError` if pixel buffer or writer operations fail.
     static func generate(
-        resolution: CGSize = CGSize(width: 1920, height: 1080)
+        resolution: CGSize = CGSize(width: 1920, height: 1080),
+        fps: Int32 = 30
     ) async throws -> URL {
+        let cacheKey = "\(Int(resolution.width))x\(Int(resolution.height))@\(fps)"
+        if let cached = cachedURL(for: cacheKey) {
+            return cached
+        }
+
         let outputURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("coreo_bumper_\(UUID().uuidString).mp4")
 
@@ -87,17 +91,29 @@ enum EndBumperGenerator {
         let totalFrames = Int(durationSeconds * Double(fps))
 
         // Write frames
-        for frameIndex in 0..<totalFrames {
+        for frameIndex in 0 ..< totalFrames {
+            try Task.checkCancellation()
             // Wait for the writer input to be ready.
+            var waitIterations = 0
             while !writerInput.isReadyForMoreMediaData {
-                try await Task.sleep(nanoseconds: 10_000_000)  // 10ms
+                try Task.checkCancellation()
+                if writer.status == .failed || writer.status == .cancelled {
+                    let errorMsg = writer.error?.localizedDescription ?? "Writer stopped."
+                    throw BumperError.writingFailed(errorMsg)
+                }
+                waitIterations += 1
+                if waitIterations > 500 {
+                    writer.cancelWriting()
+                    throw BumperError.writingFailed("Timed out waiting for the bumper writer.")
+                }
+                try await Task.sleep(nanoseconds: 10_000_000) // 10ms
             }
 
             let presentationTime = CMTime(
                 value: CMTimeValue(frameIndex),
                 timescale: fps
             )
-            let opacity = opacityForFrame(frameIndex, totalFrames: totalFrames)
+            let opacity = opacityForFrame(frameIndex, totalFrames: totalFrames, fps: fps)
 
             guard let pixelBuffer = try createFrame(
                 resolution: resolution,
@@ -121,6 +137,7 @@ enum EndBumperGenerator {
             throw BumperError.writingFailed(errorMsg)
         }
 
+        storeCachedURL(outputURL, for: cacheKey)
         return outputURL
     }
 
@@ -134,7 +151,7 @@ enum EndBumperGenerator {
     /// - Returns: A configured AVAssetWriter.
     private static func createWriter(
         outputURL: URL,
-        resolution: CGSize
+        resolution _: CGSize
     ) throws -> AVAssetWriter {
         do {
             return try AVAssetWriter(outputURL: outputURL, fileType: .mp4)
@@ -154,8 +171,8 @@ enum EndBumperGenerator {
             AVVideoHeightKey: Int(resolution.height),
             AVVideoCompressionPropertiesKey: [
                 AVVideoAverageBitRateKey: 5_000_000,
-                AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel
-            ]
+                AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel,
+            ],
         ]
         let input = AVAssetWriterInput(mediaType: .video, outputSettings: settings)
         input.expectsMediaDataInRealTime = false
@@ -167,7 +184,7 @@ enum EndBumperGenerator {
         [
             kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
             kCVPixelBufferWidthKey as String: Int(resolution.width),
-            kCVPixelBufferHeightKey as String: Int(resolution.height)
+            kCVPixelBufferHeightKey as String: Int(resolution.height),
         ]
     }
 
@@ -181,9 +198,13 @@ enum EndBumperGenerator {
     ///   - frameIndex: Current frame (0-based).
     ///   - totalFrames: Total number of frames.
     /// - Returns: Opacity from 0.0 to 1.0.
-    private static func opacityForFrame(_ frameIndex: Int, totalFrames: Int) -> CGFloat {
-        let fadeInFrames = Int(0.3 * Double(fps))    // 9 frames
-        let fadeOutFrames = Int(0.3 * Double(fps))   // 9 frames
+    private static func opacityForFrame(
+        _ frameIndex: Int,
+        totalFrames: Int,
+        fps: Int32
+    ) -> CGFloat {
+        let fadeInFrames = Int(0.3 * Double(fps)) // 9 frames
+        let fadeOutFrames = Int(0.3 * Double(fps)) // 9 frames
         let fadeOutStart = totalFrames - fadeOutFrames
 
         if frameIndex < fadeInFrames {
@@ -212,7 +233,7 @@ enum EndBumperGenerator {
     ) throws -> CVPixelBuffer? {
         var pixelBuffer: CVPixelBuffer?
 
-        if let pool = pool {
+        if let pool {
             let status = CVPixelBufferPoolCreatePixelBuffer(nil, pool, &pixelBuffer)
             guard status == kCVReturnSuccess, pixelBuffer != nil else {
                 return nil
@@ -220,7 +241,7 @@ enum EndBumperGenerator {
         } else {
             let attrs: [String: Any] = [
                 kCVPixelBufferCGImageCompatibilityKey as String: true,
-                kCVPixelBufferCGBitmapContextCompatibilityKey as String: true
+                kCVPixelBufferCGBitmapContextCompatibilityKey as String: true,
             ]
             let status = CVPixelBufferCreate(
                 nil,
@@ -245,7 +266,7 @@ enum EndBumperGenerator {
         let width = Int(resolution.width)
         let height = Int(resolution.height)
 
-        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
         guard let context = CGContext(
             data: baseAddress,
             width: width,
@@ -291,7 +312,7 @@ enum EndBumperGenerator {
         let font = UIFont.systemFont(ofSize: fontSize, weight: .medium)
         let attributes: [NSAttributedString.Key: Any] = [
             .font: font,
-            .foregroundColor: UIColor.white.withAlphaComponent(opacity)
+            .foregroundColor: UIColor.white.withAlphaComponent(opacity),
         ]
 
         let textSize = text.size(withAttributes: attributes)
@@ -314,5 +335,32 @@ enum EndBumperGenerator {
 
         context.restoreGState()
         UIGraphicsPopContext()
+    }
+
+    /// Returns a cached bumper URL if the file still exists.
+    ///
+    /// - Parameter key: Cache key for resolution and frame rate.
+    /// - Returns: Existing bumper URL, or nil if none is cached.
+    private static func cachedURL(for key: String) -> URL? {
+        cacheLock.lock()
+        defer { cacheLock.unlock() }
+        guard let url = cachedBumpers[key],
+              FileManager.default.fileExists(atPath: url.path)
+        else {
+            cachedBumpers[key] = nil
+            return nil
+        }
+        return url
+    }
+
+    /// Stores a generated bumper URL in the in-memory cache.
+    ///
+    /// - Parameters:
+    ///   - url: Generated bumper file URL.
+    ///   - key: Cache key for resolution and frame rate.
+    private static func storeCachedURL(_ url: URL, for key: String) {
+        cacheLock.lock()
+        cachedBumpers[key] = url
+        cacheLock.unlock()
     }
 }

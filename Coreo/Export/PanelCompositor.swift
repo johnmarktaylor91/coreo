@@ -6,8 +6,44 @@
 // default layer-instruction approach which has no built-in clipping and
 // can cause tracks to bleed into adjacent panels.
 
-import AVFoundation
+@preconcurrency import AVFoundation
 import CoreImage
+
+// MARK: - AnnotationFrameRendering
+
+/// Extension point for Wave 5 per-frame annotation rendering.
+protocol AnnotationFrameRendering: Sendable {
+    /// Renders annotations over the current frame result.
+    ///
+    /// - Parameters:
+    ///   - image: Current composited frame.
+    ///   - time: Composition time for the frame.
+    ///   - renderSize: Output render size.
+    /// - Returns: Frame image after annotation rendering.
+    func renderAnnotations(
+        over image: CIImage,
+        at time: CMTime,
+        renderSize: CGSize
+    ) -> CIImage
+}
+
+/// No-op annotation renderer used until Wave 5 plugs in real overlays.
+struct EmptyAnnotationFrameRenderer: AnnotationFrameRendering {
+    /// Returns the frame unchanged.
+    ///
+    /// - Parameters:
+    ///   - image: Current composited frame.
+    ///   - time: Composition time for the frame.
+    ///   - renderSize: Output render size.
+    /// - Returns: The unchanged frame image.
+    func renderAnnotations(
+        over image: CIImage,
+        at _: CMTime,
+        renderSize _: CGSize
+    ) -> CIImage {
+        image
+    }
+}
 
 // MARK: - PanelCompositionInstruction
 
@@ -39,11 +75,13 @@ final class PanelCompositionInstruction: NSObject, AVVideoCompositionInstruction
     let bgRed: CGFloat
     let bgGreen: CGFloat
     let bgBlue: CGFloat
+    let annotationRenderer: any AnnotationFrameRendering
 
     init(
         timeRange: CMTimeRange,
         panelConfigs: [PanelConfig],
         renderSize: CGSize,
+        annotationRenderer: any AnnotationFrameRendering = EmptyAnnotationFrameRenderer(),
         bgRed: CGFloat = 10.0 / 255.0,
         bgGreen: CGFloat = 10.0 / 255.0,
         bgBlue: CGFloat = 10.0 / 255.0
@@ -54,7 +92,8 @@ final class PanelCompositionInstruction: NSObject, AVVideoCompositionInstruction
         self.bgRed = bgRed
         self.bgGreen = bgGreen
         self.bgBlue = bgBlue
-        self.requiredSourceTrackIDs = panelConfigs.map {
+        self.annotationRenderer = annotationRenderer
+        requiredSourceTrackIDs = panelConfigs.map {
             NSNumber(value: $0.trackID) as NSValue
         }
         super.init()
@@ -67,7 +106,6 @@ final class PanelCompositionInstruction: NSObject, AVVideoCompositionInstruction
 /// panel with explicit clipping. Handles rotation, aspect-fit scaling,
 /// and optional crop rects.
 final class PanelCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
-
     private let ciContext = CIContext(options: [.useSoftwareRenderer: false])
     private let renderQueue = DispatchQueue(
         label: "com.coreo.panel-compositor",
@@ -84,7 +122,7 @@ final class PanelCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
         [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
     }
 
-    func renderContextChanged(_ newRenderContext: AVVideoCompositionRenderContext) {}
+    func renderContextChanged(_: AVVideoCompositionRenderContext) {}
     func cancelAllPendingVideoCompositionRequests() {}
 
     func startRequest(_ request: AVAsynchronousVideoCompositionRequest) {
@@ -97,7 +135,8 @@ final class PanelCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
 
     private func compositeFrame(_ request: AVAsynchronousVideoCompositionRequest) {
         guard let instruction = request.videoCompositionInstruction
-                as? PanelCompositionInstruction else {
+            as? PanelCompositionInstruction
+        else {
             request.finish(with: NSError(
                 domain: "PanelCompositor",
                 code: -1,
@@ -139,6 +178,13 @@ final class PanelCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
             image = image.oriented(orientation)
 
             // Image extent is now in display orientation (y-up, CIImage coords).
+            if let cropRect = config.cropRect {
+                image = image.cropped(to: ExportPlan.ciCropRect(
+                    for: cropRect,
+                    extent: image.extent
+                ))
+            }
+
             let extent = image.extent
             guard extent.width > 0, extent.height > 0 else { continue }
 
@@ -150,17 +196,10 @@ final class PanelCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
                 height: config.panelRect.height
             )
 
-            // Aspect-fill: use the larger scale so the video fills the
-            // panel completely. Overflow is clipped by cropped(to:) below.
-            let scaleX = ciPanel.width / extent.width
-            let scaleY = ciPanel.height / extent.height
-            let scale = max(scaleX, scaleY)
-
-            // Centered position within the panel.
-            let scaledW = extent.width * scale
-            let scaledH = extent.height * scale
-            let offsetX = ciPanel.origin.x + (ciPanel.width - scaledW) / 2
-            let offsetY = ciPanel.origin.y + (ciPanel.height - scaledH) / 2
+            let placement = ExportPlan.aspectFitTransform(
+                contentExtent: extent,
+                panelRect: ciPanel
+            )
 
             // Move image origin to (0,0), scale, then position in panel.
             image = image.transformed(by: CGAffineTransform(
@@ -168,11 +207,11 @@ final class PanelCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
                 y: -extent.origin.y
             ))
             image = image.transformed(by: CGAffineTransform(
-                scaleX: scale, y: scale
+                scaleX: placement.scale, y: placement.scale
             ))
             image = image.transformed(by: CGAffineTransform(
-                translationX: offsetX,
-                y: offsetY
+                translationX: placement.offset.x,
+                y: placement.offset.y
             ))
 
             // Clip to panel bounds — the key operation that prevents bleed.
@@ -181,6 +220,12 @@ final class PanelCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
             // Layer over the current result.
             result = image.composited(over: result)
         }
+
+        result = instruction.annotationRenderer.renderAnnotations(
+            over: result,
+            at: request.compositionTime,
+            renderSize: renderSize
+        )
 
         ciContext.render(result, to: outputBuffer)
         request.finish(withComposedVideoFrame: outputBuffer)
@@ -198,14 +243,14 @@ final class PanelCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
         let c = round(transform.c)
         let d = round(transform.d)
 
-        if a == 0 && b == 1 && c == -1 && d == 0 {
-            return .right    // 90° CW  — portrait, home bottom
-        } else if a == 0 && b == -1 && c == 1 && d == 0 {
-            return .left     // 90° CCW — portrait, home top
-        } else if a == -1 && b == 0 && c == 0 && d == -1 {
-            return .down     // 180°    — landscape, home left
+        if a == 0, b == 1, c == -1, d == 0 {
+            return .right // 90° CW  — portrait, home bottom
+        } else if a == 0, b == -1, c == 1, d == 0 {
+            return .left // 90° CCW — portrait, home top
+        } else if a == -1, b == 0, c == 0, d == -1 {
+            return .down // 180°    — landscape, home left
         } else {
-            return .up       // 0°      — landscape, home right
+            return .up // 0°      — landscape, home right
         }
     }
 }

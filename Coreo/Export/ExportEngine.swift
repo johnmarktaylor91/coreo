@@ -8,7 +8,7 @@
 // 3. Optionally appending a 1-second end bumper
 // 4. Building an AVMutableVideoComposition with layout transforms AFTER all
 //    composition modifications (so the instruction covers the final duration)
-// 5. Optionally overlaying annotations via CoreAnimationTool
+// 5. Leaving an annotation-rendering hook for the custom compositor
 // 6. Exporting via AVAssetExportSession
 
 import AVFoundation
@@ -25,65 +25,99 @@ enum ExportError: Error, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .noVideos:
-            return "No videos to export."
-        case .compositionFailed(let detail):
-            return "Composition failed: \(detail)"
-        case .exportFailed(let detail):
-            return "Export failed: \(detail)"
+            "No videos to export."
+        case let .compositionFailed(detail):
+            "Composition failed: \(detail)"
+        case let .exportFailed(detail):
+            "Export failed: \(detail)"
         case .diskFull:
-            return "Not enough disk space to complete the export."
+            "Not enough disk space to complete the export."
         case .cancelled:
-            return "Export was cancelled."
+            "Export was cancelled."
         }
     }
 }
 
 /// Handles exporting the multi-angle video composition as a single .mp4 file.
 enum ExportEngine {
-
-    private static let exportFPS: Int32 = 30
     private static let timescale: CMTimeScale = 600
+
+    private struct LoadedSource {
+        let videoTrack: AVAssetTrack
+        let audioTrack: AVAssetTrack?
+        let displaySize: CGSize
+        let preferredTransform: CGAffineTransform
+        let videoTimeRange: CMTimeRange
+        let audioTimeRange: CMTimeRange?
+        let nominalFrameRate: Float
+    }
 
     // MARK: - Public
 
     /// Exports the project as a single composited video file.
-    @MainActor
     static func export(
         project: CoreoProject,
         resolution: CGSize = CGSize(width: 1920, height: 1080),
-        progressHandler: @escaping (Double) -> Void
+        progressHandler: @escaping @Sendable (Double) -> Void
     ) async throws -> URL {
         guard !project.videos.isEmpty else {
             throw ExportError.noVideos
         }
 
-        // Sanitize stale indices before using them.
+        guard project.videos.count == project.syncOffsets.count else {
+            throw ExportError.compositionFailed(
+                "Project sync data is inconsistent. Re-sync your videos before exporting."
+            )
+        }
+
+        try Task.checkCancellation()
+
+        // Sanitize stale scalar indices before using them. Sync-offset count was
+        // validated above so this cannot silently zero alignment data.
         var project = project
         project.sanitizeIndices()
 
-        try checkDiskSpace(minimumBytes: 500_000_000)
         progressHandler(0.0)
 
         // Step 1: Load assets.
-        let assets = try await loadAssets(project: project)
+        let sources = try await loadSources(project: project)
+        try Task.checkCancellation()
         progressHandler(0.05)
 
-        // Step 2: Build composition with video + audio tracks.
-        let (composition, videoTracks, videoSizes, trackTransforms) = try await buildComposition(
+        let plan = try ExportPlan(
             project: project,
-            assets: assets
+            sources: makePlanSources(project: project, sources: sources),
+            renderSize: resolution
         )
+        guard plan.panels.count == project.videos.count else {
+            throw ExportError.compositionFailed(
+                "Layout returned \(plan.panels.count) panels for \(project.videos.count) videos."
+            )
+        }
+
+        try checkDiskSpace(requiredBytes: plan.estimatedOutputBytes)
+        try Task.checkCancellation()
+
+        // Step 2: Build composition with video + audio tracks.
+        let (composition, videoTracks, videoSizes, trackTransforms, sourceVideoTracks) = try await buildComposition(
+            project: project,
+            sources: sources,
+            plan: plan
+        )
+        try Task.checkCancellation()
         progressHandler(0.15)
 
         // Step 3: Apply speed/hold (if any). Done before video composition
         // so the instruction timeRange reflects the final duration.
         if !project.speedSegments.isEmpty {
-            applySpeedSegments(
+            try applySpeedSegments(
                 to: composition,
-                speedSegments: project.speedSegments,
-                timelineStart: project.timelineStartSeconds
+                plan: plan,
+                sourceVideoTracks: sourceVideoTracks,
+                compositionVideoTracks: videoTracks
             )
         }
+        try Task.checkCancellation()
         progressHandler(0.20)
 
         // Record the main content duration before bumper.
@@ -91,16 +125,25 @@ enum ExportEngine {
 
         // Step 4: Append end bumper (non-fatal on failure).
         var hasBumper = false
+        var bumperURL: URL?
+        var shouldKeepBumperCache = false
         do {
-            try await appendEndBumper(
+            bumperURL = try await appendEndBumper(
                 to: composition,
                 videoTracks: videoTracks,
-                renderSize: resolution
+                renderSize: resolution,
+                fps: plan.outputFPS
             )
             hasBumper = true
         } catch {
-            print("End bumper failed, skipping: \(error)")
+            hasBumper = false
         }
+        defer {
+            if let bumperURL, !shouldKeepBumperCache {
+                try? FileManager.default.removeItem(at: bumperURL)
+            }
+        }
+        try Task.checkCancellation()
         progressHandler(0.30)
 
         // Step 5: Build video composition AFTER all duration changes.
@@ -113,148 +156,176 @@ enum ExportEngine {
             trackTransforms: trackTransforms,
             renderSize: resolution,
             mainContentDuration: mainContentDuration,
-            hasBumper: hasBumper
+            hasBumper: hasBumper,
+            outputFPS: plan.outputFPS,
+            plan: plan
         )
+        try Task.checkCancellation()
         progressHandler(0.35)
 
-        // Step 6: Annotation overlay.
-        // Note: AVVideoCompositionCoreAnimationTool is incompatible with
-        // custom AVVideoCompositing (PanelCompositor). Annotation rendering
-        // will be integrated into PanelCompositor in a future task. For now,
-        // annotations are skipped during export to ensure split-screen works.
+        // Step 6: Annotation seam. Wave 5 will provide render items here.
+        // The custom compositor receives the empty hook through each instruction.
         progressHandler(0.40)
 
         // Step 7: Export.
         let outputURL = try await performExport(
             composition: composition,
             videoComposition: videoComposition,
-            progressHandler: { p in
-                progressHandler(0.40 + p * 0.60)
+            progressHandler: { sessionProgress in
+                progressHandler(0.40 + sessionProgress * 0.60)
             }
         )
 
+        try Task.checkCancellation()
+        shouldKeepBumperCache = true
         progressHandler(1.0)
         return outputURL
     }
 
     // MARK: - Step 1: Load Assets
 
-    private static func loadAssets(project: CoreoProject) async throws -> [AVURLAsset] {
-        var assets: [AVURLAsset] = []
-        for video in project.videos {
+    private static func loadSources(project: CoreoProject) async throws -> [LoadedSource] {
+        var sources: [LoadedSource] = []
+        for (index, video) in project.videos.enumerated() {
+            try Task.checkCancellation()
             let asset = AVURLAsset(url: video.localURL)
-            _ = try await asset.load(.tracks, .duration)
-            assets.append(asset)
+            let videoTracks = try await asset.loadTracks(withMediaType: .video)
+            guard let videoTrack = videoTracks.first else {
+                throw ExportError.compositionFailed("Video \(index) has no video track.")
+            }
+
+            let audioTracks = try await asset.loadTracks(withMediaType: .audio)
+            let audioTrack = audioTracks.first
+            let naturalSize = try await videoTrack.load(.naturalSize)
+            let transform = try await videoTrack.load(.preferredTransform)
+            let transformedSize = naturalSize.applying(transform)
+            let displaySize = CGSize(
+                width: abs(transformedSize.width),
+                height: abs(transformedSize.height)
+            )
+            let videoTimeRange = try await videoTrack.load(.timeRange)
+            let audioTimeRange = try await audioTrack?.load(.timeRange)
+            let nominalFrameRate = try await videoTrack.load(.nominalFrameRate)
+
+            sources.append(LoadedSource(
+                videoTrack: videoTrack,
+                audioTrack: audioTrack,
+                displaySize: displaySize,
+                preferredTransform: transform,
+                videoTimeRange: videoTimeRange,
+                audioTimeRange: audioTimeRange,
+                nominalFrameRate: nominalFrameRate
+            ))
         }
-        return assets
+        return sources
     }
 
     // MARK: - Step 2: Build Composition
 
     private static func buildComposition(
         project: CoreoProject,
-        assets: [AVURLAsset]
-    ) async throws -> (AVMutableComposition, [AVMutableCompositionTrack], [CGSize], [CGAffineTransform]) {
+        sources: [LoadedSource],
+        plan: ExportPlan
+    ) async throws -> (
+        AVMutableComposition,
+        [AVMutableCompositionTrack],
+        [CGSize],
+        [CGAffineTransform],
+        [AVAssetTrack]
+    ) {
         let composition = AVMutableComposition()
         var compositionVideoTracks: [AVMutableCompositionTrack] = []
         var videoSizes: [CGSize] = []
         var trackTransforms: [CGAffineTransform] = []
+        var sourceVideoTracks: [AVAssetTrack] = []
 
-        let timelineStart = project.timelineStartSeconds
-
-        for (index, asset) in assets.enumerated() {
-            let assetVideoTracks = try await asset.loadTracks(withMediaType: .video)
-            guard let sourceVideoTrack = assetVideoTracks.first else {
-                throw ExportError.compositionFailed("Video \(index) has no video track.")
-            }
+        for insert in plan.clipInserts {
+            try Task.checkCancellation()
+            let source = sources[insert.index]
 
             guard let compVideoTrack = composition.addMutableTrack(
                 withMediaType: .video,
                 preferredTrackID: kCMPersistentTrackID_Invalid
             ) else {
-                throw ExportError.compositionFailed("Failed to add video track \(index).")
+                throw ExportError.compositionFailed("Failed to add video track \(insert.index).")
             }
 
-            let syncOffset = index < project.syncOffsets.count
-                ? project.syncOffsets[index] : 0.0
-            let videoDuration = project.videos[index].durationSeconds
-            let assetDuration = CMTime(seconds: videoDuration, preferredTimescale: timescale)
-            let insertTime = CMTime(
-                seconds: max(0, syncOffset - timelineStart),
-                preferredTimescale: timescale
-            )
-            let sourceTimeRange = CMTimeRange(start: .zero, duration: assetDuration)
-
             try compVideoTrack.insertTimeRange(
-                sourceTimeRange, of: sourceVideoTrack, at: insertTime
-            )
-
-            // Natural size accounting for rotation.
-            let naturalSize = try await sourceVideoTrack.load(.naturalSize)
-            let transform = try await sourceVideoTrack.load(.preferredTransform)
-            let transformedSize = naturalSize.applying(transform)
-            let correctedSize = CGSize(
-                width: abs(transformedSize.width),
-                height: abs(transformedSize.height)
+                insert.sourceRange,
+                of: source.videoTrack,
+                at: insert.insertTime
             )
 
             compositionVideoTracks.append(compVideoTrack)
-            videoSizes.append(correctedSize)
-            trackTransforms.append(transform)
-
-            // Audio: only for the designated source.
-            if index == project.audioSourceIndex {
-                let assetAudioTracks = try await asset.loadTracks(withMediaType: .audio)
-                if let sourceAudioTrack = assetAudioTracks.first,
-                   let compAudioTrack = composition.addMutableTrack(
-                       withMediaType: .audio,
-                       preferredTrackID: kCMPersistentTrackID_Invalid
-                   ) {
-                    try compAudioTrack.insertTimeRange(
-                        sourceTimeRange, of: sourceAudioTrack, at: insertTime
-                    )
-                }
-            }
+            videoSizes.append(source.displaySize)
+            trackTransforms.append(source.preferredTransform)
+            sourceVideoTracks.append(source.videoTrack)
         }
 
-        return (composition, compositionVideoTracks, videoSizes, trackTransforms)
+        if let audioIndex = plan.audioSourceIndex,
+           let source = sources[safe: audioIndex],
+           let sourceAudioTrack = source.audioTrack,
+           let audioTimeRange = source.audioTimeRange,
+           let compAudioTrack = composition.addMutableTrack(
+               withMediaType: .audio,
+               preferredTrackID: kCMPersistentTrackID_Invalid
+           )
+        {
+            let insertTime = CMTime(
+                seconds: max(0, project.syncOffsets[audioIndex] - project.timelineStartSeconds),
+                preferredTimescale: timescale
+            )
+            try compAudioTrack.insertTimeRange(
+                audioTimeRange,
+                of: sourceAudioTrack,
+                at: insertTime
+            )
+        }
+
+        return (composition, compositionVideoTracks, videoSizes, trackTransforms, sourceVideoTracks)
     }
 
     // MARK: - Step 3: Speed Segments
 
     private static func applySpeedSegments(
         to composition: AVMutableComposition,
-        speedSegments: [SpeedSegment],
-        timelineStart: Double
-    ) {
-        let sorted = speedSegments.sorted { $0.startTimeSeconds > $1.startTimeSeconds }
-        for segment in sorted {
-            let segStart = CMTime(
-                seconds: segment.startTimeSeconds - timelineStart,
-                preferredTimescale: timescale
-            )
-
-            if segment.isHold {
-                let holdDuration = CMTime(
-                    seconds: segment.holdDurationSeconds ?? 1.0,
-                    preferredTimescale: timescale
+        plan: ExportPlan,
+        sourceVideoTracks: [AVAssetTrack],
+        compositionVideoTracks: [AVMutableCompositionTrack]
+    ) throws {
+        for edit in plan.timelineEdits {
+            switch edit {
+            case let .scale(range, duration):
+                let bounded = CMTimeRangeGetIntersection(
+                    range,
+                    otherRange: CMTimeRange(start: .zero, duration: composition.duration)
                 )
-                composition.insertEmptyTimeRange(
-                    CMTimeRange(start: segStart, duration: holdDuration)
+                guard bounded.duration > .zero else { continue }
+                composition.scaleTimeRange(bounded, toDuration: duration)
+            case let .freeze(clipIndex, compositionTime, sourceTime, frameDuration, holdDuration):
+                guard clipIndex < sourceVideoTracks.count,
+                      clipIndex < compositionVideoTracks.count else { continue }
+                let frameRange = CMTimeRange(start: sourceTime, duration: frameDuration)
+                let insertedRange = CMTimeRange(start: compositionTime, duration: frameDuration)
+                try compositionVideoTracks[clipIndex].insertTimeRange(
+                    frameRange,
+                    of: sourceVideoTracks[clipIndex],
+                    at: compositionTime
                 )
-            } else if segment.rate != 1.0, segment.rate > 0 {
-                let segDuration = CMTime(
-                    seconds: segment.durationSeconds,
-                    preferredTimescale: timescale
+                compositionVideoTracks[clipIndex].scaleTimeRange(
+                    insertedRange,
+                    toDuration: holdDuration
                 )
-                let scaledDuration = CMTime(
-                    seconds: segment.durationSeconds / Double(segment.rate),
-                    preferredTimescale: timescale
-                )
-                composition.scaleTimeRange(
-                    CMTimeRange(start: segStart, duration: segDuration),
-                    toDuration: scaledDuration
-                )
+            case let .gap(clipIndex, range):
+                if let clipIndex,
+                   clipIndex < compositionVideoTracks.count
+                {
+                    compositionVideoTracks[clipIndex].insertEmptyTimeRange(range)
+                } else {
+                    for audioTrack in composition.tracks(withMediaType: .audio) {
+                        audioTrack.insertEmptyTimeRange(range)
+                    }
+                }
             }
         }
     }
@@ -264,14 +335,15 @@ enum ExportEngine {
     private static func appendEndBumper(
         to composition: AVMutableComposition,
         videoTracks: [AVMutableCompositionTrack],
-        renderSize: CGSize
-    ) async throws {
-        let bumperURL = try await EndBumperGenerator.generate(resolution: renderSize)
+        renderSize: CGSize,
+        fps: Int32
+    ) async throws -> URL {
+        let bumperURL = try await EndBumperGenerator.generate(resolution: renderSize, fps: fps)
         let bumperAsset = AVURLAsset(url: bumperURL)
         let bumperDuration = try await bumperAsset.load(.duration)
         let bumperVideoTracks = try await bumperAsset.loadTracks(withMediaType: .video)
 
-        guard let bumperVideoTrack = bumperVideoTracks.first else { return }
+        guard let bumperVideoTrack = bumperVideoTracks.first else { return bumperURL }
 
         let insertTime = composition.duration
         let bumperRange = CMTimeRange(start: .zero, duration: bumperDuration)
@@ -288,7 +360,7 @@ enum ExportEngine {
             }
         }
 
-        try? FileManager.default.removeItem(at: bumperURL)
+        return bumperURL
     }
 
     // MARK: - Step 5: Video Composition (Panel Compositor)
@@ -296,45 +368,21 @@ enum ExportEngine {
     /// Builds the video composition using PanelCompositor for reliable
     /// multi-track rendering with per-panel clipping.
     private static func buildVideoComposition(
-        project: CoreoProject,
+        project _: CoreoProject,
         composition: AVMutableComposition,
         videoTracks: [AVMutableCompositionTrack],
         videoSizes: [CGSize],
         trackTransforms: [CGAffineTransform],
         renderSize: CGSize,
         mainContentDuration: CMTime,
-        hasBumper: Bool
+        hasBumper: Bool,
+        outputFPS: Int32,
+        plan: ExportPlan
     ) -> AVMutableVideoComposition {
         let videoComposition = AVMutableVideoComposition()
         videoComposition.renderSize = renderSize
-        videoComposition.frameDuration = CMTime(value: 1, timescale: exportFPS)
+        videoComposition.frameDuration = CMTime(value: 1, timescale: outputFPS)
         videoComposition.customVideoCompositorClass = PanelCompositor.self
-
-        // Calculate panel layout.
-        let aspectRatios = videoSizes.map { size -> CGFloat in
-            guard size.height > 0 else { return 16.0 / 9.0 }
-            return size.width / size.height
-        }
-
-        let panelRects: [CGRect]
-        if let overrides = project.layoutOverrides,
-           overrides.panelRects.count == videoTracks.count {
-            panelRects = overrides.panelRects.map { rect in
-                CGRect(
-                    x: rect.origin.x * renderSize.width,
-                    y: rect.origin.y * renderSize.height,
-                    width: rect.size.width * renderSize.width,
-                    height: rect.size.height * renderSize.height
-                )
-            }
-        } else {
-            panelRects = LayoutEngine.calculateLayout(
-                videoCount: project.videos.count,
-                aspectRatios: aspectRatios,
-                containerSize: renderSize,
-                gap: 4
-            )
-        }
 
         var instructions: [AVVideoCompositionInstructionProtocol] = []
 
@@ -343,24 +391,28 @@ enum ExportEngine {
         for (index, track) in videoTracks.enumerated() {
             let videoSize = index < videoSizes.count
                 ? videoSizes[index] : CGSize(width: 1920, height: 1080)
-            let panelRect = index < panelRects.count
-                ? panelRects[index] : CGRect(origin: .zero, size: renderSize)
+            guard let panel = plan.panels.first(where: { $0.index == index }) else {
+                continue
+            }
             let sourceTransform = index < trackTransforms.count
                 ? trackTransforms[index] : .identity
 
             mainPanelConfigs.append(PanelCompositionInstruction.PanelConfig(
                 trackID: track.trackID,
-                panelRect: panelRect,
+                panelRect: panel.rect,
                 videoSize: videoSize,
                 sourceTransform: sourceTransform,
-                cropRect: project.cropOverrides?[index]
+                cropRect: panel.cropRect
             ))
         }
+
+        assert(mainPanelConfigs.count == videoTracks.count, "Export layout returned the wrong panel count.")
 
         let mainInstruction = PanelCompositionInstruction(
             timeRange: CMTimeRange(start: .zero, duration: mainContentDuration),
             panelConfigs: mainPanelConfigs,
-            renderSize: renderSize
+            renderSize: renderSize,
+            annotationRenderer: EmptyAnnotationFrameRenderer()
         )
         instructions.append(mainInstruction)
 
@@ -380,7 +432,8 @@ enum ExportEngine {
                 let bumperInstruction = PanelCompositionInstruction(
                     timeRange: CMTimeRange(start: bumperStart, duration: bumperDuration),
                     panelConfigs: [bumperConfig],
-                    renderSize: renderSize
+                    renderSize: renderSize,
+                    annotationRenderer: EmptyAnnotationFrameRenderer()
                 )
                 instructions.append(bumperInstruction)
             }
@@ -390,52 +443,39 @@ enum ExportEngine {
         return videoComposition
     }
 
-    // MARK: - Step 6: Annotation Overlay
-
-    private static func applyAnnotationOverlay(
-        to videoComposition: AVMutableVideoComposition,
-        annotations: [TimedAnnotation],
-        renderSize: CGSize,
-        timelineStart: Double,
-        timelineDuration: Double
-    ) {
-        let (parentLayer, videoLayer) = AnnotationCompositor.buildLayers(
-            annotations: annotations,
-            renderSize: renderSize,
-            timelineStart: timelineStart,
-            timelineDuration: timelineDuration
-        )
-
-        videoComposition.animationTool = AVVideoCompositionCoreAnimationTool(
-            postProcessingAsVideoLayer: videoLayer,
-            in: parentLayer
-        )
-    }
-
     // MARK: - Step 7: Export Session
 
-    @MainActor
     private static func performExport(
         composition: AVMutableComposition,
         videoComposition: AVMutableVideoComposition,
-        progressHandler: @escaping (Double) -> Void
+        progressHandler: @escaping @Sendable (Double) -> Void
     ) async throws -> URL {
         let outputURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("coreo_export_\(UUID().uuidString).mp4")
         try? FileManager.default.removeItem(at: outputURL)
 
         // Request background execution time so the export survives app backgrounding.
-        var backgroundTaskID = UIBackgroundTaskIdentifier.invalid
-        backgroundTaskID = await UIApplication.shared.beginBackgroundTask {
-            // Expiration handler — system is about to suspend us.
-            if backgroundTaskID != .invalid {
-                UIApplication.shared.endBackgroundTask(backgroundTaskID)
-                backgroundTaskID = .invalid
+        final class BackgroundState: @unchecked Sendable {
+            var taskID = UIBackgroundTaskIdentifier.invalid
+            var expired = false
+            var exportSession: AVAssetExportSession?
+        }
+        let backgroundState = BackgroundState()
+        backgroundState.taskID = await MainActor.run {
+            UIApplication.shared.beginBackgroundTask {
+                backgroundState.expired = true
+                backgroundState.exportSession?.cancelExport()
+                if backgroundState.taskID != .invalid {
+                    UIApplication.shared.endBackgroundTask(backgroundState.taskID)
+                    backgroundState.taskID = .invalid
+                }
             }
         }
         defer {
-            if backgroundTaskID != .invalid {
-                UIApplication.shared.endBackgroundTask(backgroundTaskID)
+            if backgroundState.taskID != .invalid {
+                Task { @MainActor in
+                    UIApplication.shared.endBackgroundTask(backgroundState.taskID)
+                }
             }
         }
 
@@ -445,14 +485,27 @@ enum ExportEngine {
         ) else {
             throw ExportError.exportFailed("Could not create export session.")
         }
+        final class ExportSessionBox: @unchecked Sendable {
+            let session: AVAssetExportSession
+
+            init(_ session: AVAssetExportSession) {
+                self.session = session
+            }
+
+            func cancel() {
+                session.cancelExport()
+            }
+        }
+        let exportSessionBox = ExportSessionBox(exportSession)
 
         exportSession.videoComposition = videoComposition
         exportSession.outputURL = outputURL
         exportSession.outputFileType = .mp4
         exportSession.shouldOptimizeForNetworkUse = true
+        backgroundState.exportSession = exportSession
 
         // Progress monitoring.
-        let progressTask = Task { @MainActor in
+        let progressTask = Task {
             while !Task.isCancelled {
                 progressHandler(Double(exportSession.progress))
                 if exportSession.status == .completed
@@ -462,11 +515,21 @@ enum ExportEngine {
             }
         }
 
-        await exportSession.export()
+        await withTaskCancellationHandler {
+            await exportSession.export()
+        } onCancel: {
+            exportSessionBox.cancel()
+        }
         progressTask.cancel()
 
         switch exportSession.status {
         case .completed:
+            if backgroundState.expired {
+                try? FileManager.default.removeItem(at: outputURL)
+                throw ExportError.exportFailed(
+                    "Export was interrupted in the background. Keep Coreo open during export and try again."
+                )
+            }
             return outputURL
         case .cancelled:
             try? FileManager.default.removeItem(at: outputURL)
@@ -474,6 +537,11 @@ enum ExportEngine {
         case .failed:
             try? FileManager.default.removeItem(at: outputURL)
             let msg = exportSession.error?.localizedDescription ?? "Unknown error"
+            if backgroundState.expired {
+                throw ExportError.exportFailed(
+                    "Export was interrupted in the background. Keep Coreo open during export and try again."
+                )
+            }
             throw ExportError.exportFailed(msg)
         default:
             try? FileManager.default.removeItem(at: outputURL)
@@ -483,11 +551,38 @@ enum ExportEngine {
 
     // MARK: - Utilities
 
-    private static func checkDiskSpace(minimumBytes: Int64) throws {
+    private static func checkDiskSpace(requiredBytes: Int64) throws {
         let tempDir = FileManager.default.temporaryDirectory
-        guard let attrs = try? FileManager.default.attributesOfFileSystem(
-            forPath: tempDir.path
-        ), let free = attrs[.systemFreeSize] as? Int64 else { return }
-        if free < minimumBytes { throw ExportError.diskFull }
+        let values = try? tempDir.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
+        if let free = values?.volumeAvailableCapacityForImportantUsage {
+            if free < requiredBytes { throw ExportError.diskFull }
+            return
+        }
+        guard let attrs = try? FileManager.default.attributesOfFileSystem(forPath: tempDir.path),
+              let free = attrs[.systemFreeSize] as? Int64 else { return }
+        if free < requiredBytes { throw ExportError.diskFull }
+    }
+
+    private static func makePlanSources(
+        project: CoreoProject,
+        sources: [LoadedSource]
+    ) -> [ExportPlan.SourceVideo] {
+        sources.enumerated().map { index, source in
+            ExportPlan.SourceVideo(
+                index: index,
+                syncOffsetSeconds: project.syncOffsets[index],
+                trackTimeRange: source.videoTimeRange,
+                displaySize: source.displaySize,
+                nominalFrameRate: source.nominalFrameRate,
+                hasAudio: source.audioTrack != nil
+            )
+        }
+    }
+}
+
+private extension Array {
+    subscript(safe index: Int) -> Element? {
+        guard index >= 0, index < count else { return nil }
+        return self[index]
     }
 }

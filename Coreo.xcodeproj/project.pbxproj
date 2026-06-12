@@ -12,6 +12,7 @@
 		0DBBB0C8973EE59168E7DBAE /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = F53C8516EFED7C37FB2D8336 /* DesignSystem.swift */; };
 		0EAE865536F349288705D643 /* VideoGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAC4621903D1097792D1D1FA /* VideoGridView.swift */; };
 		168515ECCA30A987484393C2 /* ExportSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B40B7EB935411EB76E3A8C90 /* ExportSettings.swift */; };
+		17D4C1E8A9B0455AB5E8D3F2 /* ExportPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A82D1B8AB8F4E8D9BE84F21 /* ExportPlan.swift */; };
 		16E4C26022BB6A2ABE8910AC /* AnnotationToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD3BC9669CA59FFAF4E59395 /* AnnotationToolbar.swift */; };
 		18598DB64C3F3AAFF0D0AAC8 /* SpeedControlView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 848F2882E6ABE131985BA616 /* SpeedControlView.swift */; };
 		295731025BB8BE4D3513B326 /* AnnotationModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58CB611F8B2FB596771CBDD3 /* AnnotationModelTests.swift */; };
@@ -20,6 +21,7 @@
 		3E9FD381B8ADA32A73C2FD56 /* TimeFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78F1A7D9A2CAB2FD38866CB5 /* TimeFormatting.swift */; };
 		407847321F6B79C95952D3B5 /* VideoThumbnailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA96B593548A25D4AA38C869 /* VideoThumbnailView.swift */; };
 		419D95B2E7F400E1532695C0 /* ArrowAnnotationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A27504774982A729418B34BE /* ArrowAnnotationView.swift */; };
+		43D81A81F7E44D40A7B0BB2A /* ExportPlanTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C6E07C44731422080C47A69 /* ExportPlanTests.swift */; };
 		540A2FB954CC4338A7A3F735 /* FFTHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9DD7A94D95FD0BE852551F1 /* FFTHelper.swift */; };
 		56298196B45A1871D73E4473 /* AnnotationOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A7CC39B4F38C14EC537FAA0 /* AnnotationOverlayView.swift */; };
 		5650A40D272153DABC7FEE49 /* ImportViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3590416D6841AF648EAF5F1 /* ImportViewModel.swift */; };
@@ -77,6 +79,7 @@
 		223469245EACB17245F7C142 /* AudioSyncTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioSyncTests.swift; sourceTree = "<group>"; };
 		2E561E3BA7FCBE22CA60373D /* PlaybackControlsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackControlsView.swift; sourceTree = "<group>"; };
 		2E9CB7C84D4318E8BDDE7415 /* CoreoTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = CoreoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		4A82D1B8AB8F4E8D9BE84F21 /* ExportPlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportPlan.swift; sourceTree = "<group>"; };
 		524202D1ED4345FE4213C721 /* Coreo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Coreo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		58CB611F8B2FB596771CBDD3 /* AnnotationModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationModelTests.swift; sourceTree = "<group>"; };
 		5AD1ADC5FF63295B2FCD6D6E /* VideoAsset.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoAsset.swift; sourceTree = "<group>"; };
@@ -86,6 +89,7 @@
 		67B4833D4AEB1C54181B78FC /* ImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportView.swift; sourceTree = "<group>"; };
 		68D54D077EAC1686114A6DAF /* AnnotationCompositor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationCompositor.swift; sourceTree = "<group>"; };
 		77156C7733C0AB696540D574 /* CoreoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreoApp.swift; sourceTree = "<group>"; };
+		7C6E07C44731422080C47A69 /* ExportPlanTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportPlanTests.swift; sourceTree = "<group>"; };
 		78F1A7D9A2CAB2FD38866CB5 /* TimeFormatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeFormatting.swift; sourceTree = "<group>"; };
 		836D9C50D78CB209852F60F1 /* LayoutEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayoutEngineTests.swift; sourceTree = "<group>"; };
 		848F2882E6ABE131985BA616 /* SpeedControlView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedControlView.swift; sourceTree = "<group>"; };
@@ -281,6 +285,7 @@
 			children = (
 				58CB611F8B2FB596771CBDD3 /* AnnotationModelTests.swift */,
 				223469245EACB17245F7C142 /* AudioSyncTests.swift */,
+				7C6E07C44731422080C47A69 /* ExportPlanTests.swift */,
 				836D9C50D78CB209852F60F1 /* LayoutEngineTests.swift */,
 				8A301A071F44CBD5AEC1FD92 /* ModelTests.swift */,
 				D7427923A6B67371B8FC970A /* TimeFormattingTests.swift */,
@@ -294,6 +299,7 @@
 				68D54D077EAC1686114A6DAF /* AnnotationCompositor.swift */,
 				9E31A7AA8C8E9D9C6DEBEE12 /* EndBumperGenerator.swift */,
 				E2412335955689EC824A5176 /* ExportEngine.swift */,
+				4A82D1B8AB8F4E8D9BE84F21 /* ExportPlan.swift */,
 				8CABA3689CE1CD52ADA89951 /* ExportProgressView.swift */,
 				B40B7EB935411EB76E3A8C90 /* ExportSettings.swift */,
 				10B0ABA82CFA9C92B7C83779 /* PanelCompositor.swift */,
@@ -388,6 +394,7 @@
 			files = (
 				295731025BB8BE4D3513B326 /* AnnotationModelTests.swift in Sources */,
 				5A9F5E4493A2C56430611A18 /* AudioSyncTests.swift in Sources */,
+				43D81A81F7E44D40A7B0BB2A /* ExportPlanTests.swift in Sources */,
 				D185F932C17DCB61BE7A80E0 /* LayoutEngineTests.swift in Sources */,
 				F228C47A79A6A07C5778E9E0 /* ModelTests.swift in Sources */,
 				DED036A789007E2738FCA0FC /* TimeFormattingTests.swift in Sources */,
@@ -415,6 +422,7 @@
 				E1BAC1695127FD33A1EFAFEE /* DocumentPickerView.swift in Sources */,
 				FB37156109108E08EEFA14AF /* EndBumperGenerator.swift in Sources */,
 				394681F90A3007CEC4CE75EB /* ExportEngine.swift in Sources */,
+				17D4C1E8A9B0455AB5E8D3F2 /* ExportPlan.swift in Sources */,
 				FCE787A0141B8C47CF09B3DF /* ExportProgressView.swift in Sources */,
 				168515ECCA30A987484393C2 /* ExportSettings.swift in Sources */,
 				540A2FB954CC4338A7A3F735 /* FFTHelper.swift in Sources */,
