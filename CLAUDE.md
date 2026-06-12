@@ -35,8 +35,10 @@ Key entry points:
 
 ## Testing Tiers
 ```
-# Tier 1 — Fast (run on every change)
-xcodebuild test -scheme Coreo -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -only-testing:CoreoTests/UnitTests | xcbeautify
+# Tier 1 — Fast (run on every change; full unit suite runs in <1s)
+# NOTE: -only-testing:CoreoTests/UnitTests silently runs NOTHING (UnitTests is a
+# directory, not a test class) — run the suite unfiltered.
+xcodebuild test -scheme Coreo -destination 'platform=iOS Simulator,name=iPhone 17 Pro' | xcbeautify
 
 # Tier 2 — Medium (run when module boundaries change)
 xcodebuild test -scheme Coreo -destination 'platform=iOS Simulator,name=iPhone 17 Pro' | xcbeautify

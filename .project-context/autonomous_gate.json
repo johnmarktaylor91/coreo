@@ -1,0 +1,12 @@
+{
+  "mode": "autonomous",
+  "started": "2026-06-11T19:35:00-04:00",
+  "user_directive": "Plz proceed autonomously thx (full-scope improve run, authorized 18:16; merge to main when green; text when done)",
+  "exit_criteria": [
+    {"criterion": "All 6 implementation waves landed or 3-strike residual documented", "target": "6/6 waves", "status": "untested", "measured_value": "0/6", "measurement_source": "git log on codex/full-scope-improvements + STATE.md iteration log"},
+    {"criterion": "Full test suite green (no regressions vs recorded baseline)", "target": "0 unexpected failures", "status": "blocked", "measured_value": "platform download in progress", "measurement_source": "/tmp/coreo_baseline_tests.log + per-wave test runs"},
+    {"criterion": "Build green on main after merge", "target": "BUILD SUCCEEDED", "status": "untested", "measured_value": "", "measurement_source": "xcodebuild build on main post-merge"},
+    {"criterion": "SUMMARY.md + TABLED.md written", "target": "both exist", "status": "fail", "measured_value": "TABLED.md only", "measurement_source": "ls .project-context/improve/"},
+    {"criterion": "JMT texted via send-to-jmt.sh", "target": "sent", "status": "fail", "measured_value": "", "measurement_source": "iteration log"}
+  ]
+}
