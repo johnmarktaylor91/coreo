@@ -1,0 +1,27 @@
+scenario: zero-count
+canvas: w:1000.00 h:600.00
+gap: 4.00
+videoCount: 0
+aspectRatios: 
+rectCount: 0
+
+scenario: seven-count
+canvas: w:1000.00 h:600.00
+gap: 4.00
+videoCount: 7
+aspectRatios: 1.78, 1.78, 1.78, 1.78, 1.78, 1.78, 1.78
+rectCount: 0
+
+scenario: mismatched-aspect-count
+canvas: w:1000.00 h:600.00
+gap: 4.00
+videoCount: 3
+aspectRatios: 1.78, 1.78
+rectCount: 0
+
+scenario: zero-width-container
+canvas: w:0.00 h:600.00
+gap: 4.00
+videoCount: 2
+aspectRatios: 1.78, 1.78
+rectCount: 0

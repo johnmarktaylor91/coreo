@@ -1,0 +1,62 @@
+scenario: 1-wide
+canvas: w:1000.00 h:600.00
+gap: 4.00
+videoCount: 1
+aspectRatios: 1.78
+rectCount: 1
+panel[0]: x:0.00 y:0.00 w:1000.00 h:600.00
+
+scenario: 2-wide-tall
+canvas: w:1000.00 h:600.00
+gap: 4.00
+videoCount: 2
+aspectRatios: 1.78, 0.56
+rectCount: 2
+panel[0]: x:0.00 y:0.00 w:498.00 h:600.00
+panel[1]: x:502.00 y:0.00 w:498.00 h:600.00
+
+scenario: 3-mixed
+canvas: w:1000.00 h:600.00
+gap: 4.00
+videoCount: 3
+aspectRatios: 1.78, 1.33, 0.56
+rectCount: 3
+panel[0]: x:0.00 y:0.00 w:1000.00 h:298.00
+panel[1]: x:0.00 y:302.00 w:498.00 h:298.00
+panel[2]: x:502.00 y:302.00 w:498.00 h:298.00
+
+scenario: 4-grid-mixed
+canvas: w:1000.00 h:600.00
+gap: 4.00
+videoCount: 4
+aspectRatios: 1.78, 1.00, 1.33, 0.56
+rectCount: 4
+panel[0]: x:0.00 y:0.00 w:498.00 h:298.00
+panel[1]: x:502.00 y:0.00 w:498.00 h:298.00
+panel[2]: x:0.00 y:302.00 w:498.00 h:298.00
+panel[3]: x:502.00 y:302.00 w:498.00 h:298.00
+
+scenario: 5-row-candidate
+canvas: w:1000.00 h:600.00
+gap: 4.00
+videoCount: 5
+aspectRatios: 1.78, 1.78, 1.33, 1.00, 0.56
+rectCount: 5
+panel[0]: x:0.00 y:0.00 w:498.00 h:298.00
+panel[1]: x:502.00 y:0.00 w:498.00 h:298.00
+panel[2]: x:0.00 y:302.00 w:330.67 h:298.00
+panel[3]: x:334.67 y:302.00 w:330.67 h:298.00
+panel[4]: x:669.33 y:302.00 w:330.67 h:298.00
+
+scenario: 6-regression
+canvas: w:1000.00 h:600.00
+gap: 4.00
+videoCount: 6
+aspectRatios: 1.78, 1.33, 1.00, 0.56, 0.75, 2.00
+rectCount: 6
+panel[0]: x:0.00 y:0.00 w:330.67 h:298.00
+panel[1]: x:334.67 y:0.00 w:330.67 h:298.00
+panel[2]: x:669.33 y:0.00 w:330.67 h:298.00
+panel[3]: x:0.00 y:302.00 w:330.67 h:298.00
+panel[4]: x:334.67 y:302.00 w:330.67 h:298.00
+panel[5]: x:669.33 y:302.00 w:330.67 h:298.00
