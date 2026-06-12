@@ -33,7 +33,8 @@ struct LoadedProject {
 }
 
 /// Persists Coreo projects as self-contained directories.
-struct ProjectStore {
+/// Shared coder state is only accessed while `codingLock` is held.
+struct ProjectStore: @unchecked Sendable {
     /// Directory that contains every saved project directory.
     let projectsRoot: URL
 
@@ -45,6 +46,9 @@ struct ProjectStore {
 
     /// JSON decoder used for project documents.
     private let decoder: JSONDecoder
+
+    /// Lock protecting shared JSON coder instances.
+    private let codingLock = NSLock()
 
     /// Creates a project store.
     ///
@@ -200,7 +204,8 @@ struct ProjectStore {
     ///
     /// - Parameter project: Project document to write.
     func save(_ project: CoreoProject) throws {
-        try save(project, encodedData: encoder.encode(project))
+        let encodedData = try encode(project)
+        try save(project, encodedData: encodedData)
     }
 
     /// Saves pre-encoded data atomically. Internal seam for tests.
@@ -267,12 +272,12 @@ struct ProjectStore {
         guard fileManager.fileExists(atPath: url.path) else { return nil }
         do {
             let data = try Data(contentsOf: url)
-            let schema = try decoder.decode(ProjectSchemaProbe.self, from: data)
+            let schema = try decode(ProjectSchemaProbe.self, from: data)
             guard schema.schemaVersion == CoreoProject.currentSchemaVersion else {
                 renameStaleProjectFile(url)
                 return nil
             }
-            var project = try decoder.decode(CoreoProject.self, from: data)
+            var project = try decode(CoreoProject.self, from: data)
             project.sanitizeReferences()
             markMissingMedia(in: &project, projectDirectory: directory)
             return LoadedProject(project: project, projectDirectory: directory)
@@ -335,6 +340,28 @@ struct ProjectStore {
             .replacingOccurrences(of: ":", with: "-")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         return cleaned.isEmpty ? fallback : cleaned
+    }
+
+    /// Encodes a project document using the shared encoder.
+    ///
+    /// - Parameter project: Project to encode.
+    /// - Returns: JSON data.
+    private func encode(_ project: CoreoProject) throws -> Data {
+        codingLock.lock()
+        defer { codingLock.unlock() }
+        return try encoder.encode(project)
+    }
+
+    /// Decodes a project document using the shared decoder.
+    ///
+    /// - Parameters:
+    ///   - type: Decodable result type.
+    ///   - data: JSON data.
+    /// - Returns: Decoded value.
+    private func decode<T: Decodable>(_ type: T.Type, from data: Data) throws -> T {
+        codingLock.lock()
+        defer { codingLock.unlock() }
+        return try decoder.decode(type, from: data)
     }
 }
 

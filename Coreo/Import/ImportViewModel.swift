@@ -420,7 +420,7 @@ final class ImportViewModel: ObservableObject {
         audioSourceIndex: Int,
         cropRectsByVideoID: [UUID: CGRect]
     ) -> CoreoProject {
-        var updatedVideos = indexedVideos.map { item in
+        let updatedVideos = indexedVideos.map { item in
             var video = item.video
             video.syncOffsetSeconds = item.originalIndex < output.offsets.count ? output.offsets[item.originalIndex] : 0
             if let result = output.results.first(where: { $0.videoIndex == item.originalIndex }) {
@@ -443,7 +443,9 @@ final class ImportViewModel: ObservableObject {
 
     /// Imports selected URLs with bounded concurrency.
     private func importAssets(from urls: [URL]) async -> [Result<VideoAsset, ImportFailure>] {
-        await withTaskGroup(of: (Int, Result<VideoAsset, ImportFailure>).self) { group in
+        let projectStore = projectStore
+        let projectID = projectID
+        return await withTaskGroup(of: (Int, Result<VideoAsset, ImportFailure>).self) { group in
             var nextIndex = 0
             var activeCount = 0
             var results = [Result<VideoAsset, ImportFailure>?](repeating: nil, count: urls.count)
@@ -457,9 +459,9 @@ final class ImportViewModel: ObservableObject {
 
                     group.addTask {
                         do {
-                            let asset = try await self.projectStore.importVideo(
+                            let asset = try await projectStore.importVideo(
                                 from: url,
-                                projectID: self.projectID
+                                projectID: projectID
                             )
                             return (index, .success(asset))
                         } catch {

@@ -412,12 +412,14 @@ final class WorkspaceViewModel {
         mediaRecoveryErrorsByVideoID[id] = nil
         repickingMediaVideoIDs.insert(id)
         let existing = project.videos[index]
+        let projectStore = projectStore
+        let projectID = project.id
 
         do {
             let replacement = try await projectStore.importReplacementVideo(
                 from: sourceURL,
                 replacing: existing,
-                projectID: project.id
+                projectID: projectID
             )
             repickingMediaVideoIDs.remove(id)
             if MediaReplacementPolicy.requiresDurationWarning(
@@ -705,8 +707,9 @@ private extension WorkspaceViewModel {
             object: AVAudioSession.sharedInstance(),
             queue: .main
         ) { [weak self] notification in
+            let rawType = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
             Task { @MainActor [weak self] in
-                self?.handleAudioInterruption(notification)
+                self?.handleAudioInterruption(rawType: rawType)
             }
         }
     }
@@ -715,13 +718,15 @@ private extension WorkspaceViewModel {
     ///
     /// - Parameter notification: Audio interruption notification.
     func handleAudioInterruption(_ notification: Notification) {
-        guard
-            let rawType = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
-            let type = AVAudioSession.InterruptionType(rawValue: rawType)
-        else {
-            return
-        }
+        let rawType = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
+        handleAudioInterruption(rawType: rawType)
+    }
 
+    /// Handles audio interruptions from a scalar notification payload.
+    ///
+    /// - Parameter rawType: Raw `AVAudioSession.InterruptionType` value.
+    private func handleAudioInterruption(rawType: UInt?) {
+        guard let rawType, let type = AVAudioSession.InterruptionType(rawValue: rawType) else { return }
         switch type {
         case .began:
             wasPlayingBeforeBackground = playback.isPlaying

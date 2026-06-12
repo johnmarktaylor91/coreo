@@ -108,6 +108,7 @@ final class PanelCompositionInstruction: NSObject, AVVideoCompositionInstruction
 /// panel with explicit clipping. Handles rotation, aspect-fit scaling,
 /// and optional crop rects.
 final class PanelCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
+    // AVFoundation may call this compositor concurrently; immutable state is shared and rendering is serialized here.
     private let ciContext = CIContext(options: [.useSoftwareRenderer: false])
     private let renderQueue = DispatchQueue(
         label: "com.coreo.panel-compositor",
@@ -116,11 +117,11 @@ final class PanelCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
 
     // MARK: AVVideoCompositing Protocol
 
-    var sourcePixelBufferAttributes: [String: Any]? {
+    var sourcePixelBufferAttributes: [String: any Sendable]? {
         [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
     }
 
-    var requiredPixelBufferAttributesForRenderContext: [String: Any] {
+    var requiredPixelBufferAttributesForRenderContext: [String: any Sendable] {
         [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
     }
 

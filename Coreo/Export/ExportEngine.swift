@@ -454,25 +454,63 @@ enum ExportEngine {
 
         // Request background execution time so the export survives app backgrounding.
         final class BackgroundState: @unchecked Sendable {
-            var taskID = UIBackgroundTaskIdentifier.invalid
-            var expired = false
-            var exportSession: AVAssetExportSession?
+            // `taskID`, `expired`, and `exportSession` are only read or written while `lock` is held.
+            private var taskID = UIBackgroundTaskIdentifier.invalid
+            private var expired = false
+            private var exportSession: AVAssetExportSession?
+            private let lock = NSLock()
+
+            var isExpired: Bool {
+                lock.lock()
+                defer { lock.unlock() }
+                return expired
+            }
+
+            func setTaskID(_ taskID: UIBackgroundTaskIdentifier) {
+                lock.lock()
+                self.taskID = taskID
+                lock.unlock()
+            }
+
+            func setExportSession(_ exportSession: AVAssetExportSession) {
+                lock.lock()
+                self.exportSession = exportSession
+                lock.unlock()
+            }
+
+            func expireAndCancelExport() -> UIBackgroundTaskIdentifier {
+                lock.lock()
+                expired = true
+                exportSession?.cancelExport()
+                let taskID = taskID
+                self.taskID = .invalid
+                lock.unlock()
+                return taskID
+            }
+
+            func takeTaskIDForEnding() -> UIBackgroundTaskIdentifier {
+                lock.lock()
+                let taskID = taskID
+                self.taskID = .invalid
+                lock.unlock()
+                return taskID
+            }
         }
         let backgroundState = BackgroundState()
-        backgroundState.taskID = await MainActor.run {
+        let backgroundTaskID = await MainActor.run {
             UIApplication.shared.beginBackgroundTask {
-                backgroundState.expired = true
-                backgroundState.exportSession?.cancelExport()
-                if backgroundState.taskID != .invalid {
-                    UIApplication.shared.endBackgroundTask(backgroundState.taskID)
-                    backgroundState.taskID = .invalid
+                let expiredTaskID = backgroundState.expireAndCancelExport()
+                if expiredTaskID != .invalid {
+                    UIApplication.shared.endBackgroundTask(expiredTaskID)
                 }
             }
         }
+        backgroundState.setTaskID(backgroundTaskID)
         defer {
-            if backgroundState.taskID != .invalid {
+            let taskID = backgroundState.takeTaskIDForEnding()
+            if taskID != .invalid {
                 Task { @MainActor in
-                    UIApplication.shared.endBackgroundTask(backgroundState.taskID)
+                    UIApplication.shared.endBackgroundTask(taskID)
                 }
             }
         }
@@ -484,13 +522,29 @@ enum ExportEngine {
             throw ExportError.exportFailed("Could not create export session.")
         }
         final class ExportSessionBox: @unchecked Sendable {
+            // `session` is only touched through these methods while `lock` is held, except the single awaited export call.
             let session: AVAssetExportSession
+            private let lock = NSLock()
 
             init(_ session: AVAssetExportSession) {
                 self.session = session
             }
 
+            var progress: Float {
+                lock.lock()
+                defer { lock.unlock() }
+                return session.progress
+            }
+
+            var status: AVAssetExportSession.Status {
+                lock.lock()
+                defer { lock.unlock() }
+                return session.status
+            }
+
             func cancel() {
+                lock.lock()
+                defer { lock.unlock() }
                 session.cancelExport()
             }
         }
@@ -500,15 +554,16 @@ enum ExportEngine {
         exportSession.outputURL = outputURL
         exportSession.outputFileType = .mp4
         exportSession.shouldOptimizeForNetworkUse = true
-        backgroundState.exportSession = exportSession
+        backgroundState.setExportSession(exportSession)
 
         // Progress monitoring.
         let progressTask = Task {
             while !Task.isCancelled {
-                progressHandler(Double(exportSession.progress))
-                if exportSession.status == .completed
-                    || exportSession.status == .failed
-                    || exportSession.status == .cancelled { break }
+                progressHandler(Double(exportSessionBox.progress))
+                let status = exportSessionBox.status
+                if status == .completed
+                    || status == .failed
+                    || status == .cancelled { break }
                 try? await Task.sleep(nanoseconds: 100_000_000)
             }
         }
@@ -522,7 +577,7 @@ enum ExportEngine {
 
         switch exportSession.status {
         case .completed:
-            if backgroundState.expired {
+            if backgroundState.isExpired {
                 try? FileManager.default.removeItem(at: outputURL)
                 throw ExportError.exportFailed(
                     "Export was interrupted in the background. Keep Coreo open during export and try again."
@@ -535,7 +590,7 @@ enum ExportEngine {
         case .failed:
             try? FileManager.default.removeItem(at: outputURL)
             let msg = exportSession.error?.localizedDescription ?? "Unknown error"
-            if backgroundState.expired {
+            if backgroundState.isExpired {
                 throw ExportError.exportFailed(
                     "Export was interrupted in the background. Keep Coreo open during export and try again."
                 )

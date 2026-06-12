@@ -6,6 +6,7 @@
 
 import UIKit
 
+@MainActor
 enum Haptic {
     private static let lightImpact = UIImpactFeedbackGenerator(style: .light)
     private static let mediumImpact = UIImpactFeedbackGenerator(style: .medium)

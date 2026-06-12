@@ -44,8 +44,7 @@ enum EndBumperGenerator {
         blue: 10.0 / 255.0,
         alpha: 1.0
     )
-    private static var cachedBumpers: [String: URL] = [:]
-    private static let cacheLock = NSLock()
+    private static let bumperCache = EndBumperCache()
 
     // MARK: - Public
 
@@ -342,8 +341,32 @@ enum EndBumperGenerator {
     /// - Parameter key: Cache key for resolution and frame rate.
     /// - Returns: Existing bumper URL, or nil if none is cached.
     private static func cachedURL(for key: String) -> URL? {
-        cacheLock.lock()
-        defer { cacheLock.unlock() }
+        bumperCache.cachedURL(for: key)
+    }
+
+    /// Stores a generated bumper URL in the in-memory cache.
+    ///
+    /// - Parameters:
+    ///   - url: Generated bumper file URL.
+    ///   - key: Cache key for resolution and frame rate.
+    private static func storeCachedURL(_ url: URL, for key: String) {
+        bumperCache.store(url, for: key)
+    }
+}
+
+/// Thread-safe in-memory bumper cache shared by background export tasks.
+private final class EndBumperCache: @unchecked Sendable {
+    // `cachedBumpers` is only read or written while `lock` is held.
+    private var cachedBumpers: [String: URL] = [:]
+    private let lock = NSLock()
+
+    /// Returns a cached bumper URL if the file still exists.
+    ///
+    /// - Parameter key: Cache key for resolution and frame rate.
+    /// - Returns: Existing bumper URL, or nil if none is cached.
+    func cachedURL(for key: String) -> URL? {
+        lock.lock()
+        defer { lock.unlock() }
         guard let url = cachedBumpers[key],
               FileManager.default.fileExists(atPath: url.path)
         else {
@@ -358,9 +381,9 @@ enum EndBumperGenerator {
     /// - Parameters:
     ///   - url: Generated bumper file URL.
     ///   - key: Cache key for resolution and frame rate.
-    private static func storeCachedURL(_ url: URL, for key: String) {
-        cacheLock.lock()
+    func store(_ url: URL, for key: String) {
+        lock.lock()
         cachedBumpers[key] = url
-        cacheLock.unlock()
+        lock.unlock()
     }
 }

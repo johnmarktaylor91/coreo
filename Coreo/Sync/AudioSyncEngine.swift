@@ -176,15 +176,11 @@ enum AudioSyncEngine {
             throw SyncError.insufficientAudioBearingVideos
         }
         let referenceAudio = windowed(fullReferenceAudio)
-        let maxCorrelationLength = max(2, referenceAudio.count * 2)
-        let fftPlan = FFTHelper.FFTPlan(maxLength: maxCorrelationLength)
-
         var syncResults = try await correlateAudio(
             extracted: extracted,
             videos: videos,
             referenceIndex: referenceIndex,
             referenceAudio: referenceAudio,
-            fftPlan: fftPlan,
             progress: progress
         )
         syncResults.append(
@@ -265,7 +261,6 @@ enum AudioSyncEngine {
         videos: [(url: URL, audioBitrate: Int)],
         referenceIndex: Int,
         referenceAudio: [Float],
-        fftPlan: FFTHelper.FFTPlan?,
         progress: ProgressHandler?
     ) async throws -> [SyncResult] {
         var pending = extracted.filter { $0.index != referenceIndex }
@@ -291,6 +286,8 @@ enum AudioSyncEngine {
                         group.addTask {
                             try Task.checkCancellation()
                             let otherAudio = windowed(fullAudio)
+                            let maxCorrelationLength = max(2, referenceAudio.count + otherAudio.count)
+                            let fftPlan = FFTHelper.FFTPlan(maxLength: maxCorrelationLength)
                             let (lagSamples, confidence) = try FFTHelper.findOffsetCancellable(
                                 signal: otherAudio,
                                 reference: referenceAudio,

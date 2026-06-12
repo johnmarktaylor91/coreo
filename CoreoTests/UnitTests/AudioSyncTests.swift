@@ -85,7 +85,7 @@ final class AudioSyncTests: XCTestCase {
         let sampleRate = 8000
         let startDelaySamples = 2000
         let eventSample = 12000
-        let shared = generateDeterministicSignal(sampleCount: 32000)
+        let shared = Self.generateDeterministicSignal(sampleCount: 32000)
         let referenceURL = URL(fileURLWithPath: "/tmp/reference.mov")
         let delayedCameraURL = URL(fileURLWithPath: "/tmp/delayed-camera.mov")
         let signal = Array(shared.dropFirst(startDelaySamples))
@@ -119,7 +119,7 @@ final class AudioSyncTests: XCTestCase {
         let referenceURL = URL(fileURLWithPath: "/tmp/reference.mov")
         let noAudioURL = URL(fileURLWithPath: "/tmp/no-audio.mov")
         let otherURL = URL(fileURLWithPath: "/tmp/other.mov")
-        let reference = generateDeterministicSignal(sampleCount: 16000)
+        let reference = Self.generateDeterministicSignal(sampleCount: 16000)
         let other = Array(reference.dropFirst(400))
 
         let output = try await AudioSyncEngine.sync(
@@ -154,7 +154,7 @@ final class AudioSyncTests: XCTestCase {
         let referenceURL = URL(fileURLWithPath: "/tmp/reference-window.mov")
         let otherURL = URL(fileURLWithPath: "/tmp/other-window.mov")
         let shiftSamples = 1200
-        let reference = generateDeterministicSignal(sampleCount: 608_000)
+        let reference = Self.generateDeterministicSignal(sampleCount: 608_000)
         let other = Array(reference.dropFirst(shiftSamples))
 
         let output = try await AudioSyncEngine.sync(
@@ -178,24 +178,16 @@ final class AudioSyncTests: XCTestCase {
             URL(fileURLWithPath: "/tmp/a.mov"),
             URL(fileURLWithPath: "/tmp/b.mov")
         ]
-
-        let task = Task {
-            try await AudioSyncEngine.sync(
-                videos: urls.map { ($0, 128_000) },
-                audioProvider: { _, _ in
-                    for _ in 0 ..< 1000 {
-                        try Task.checkCancellation()
-                        try await Task.sleep(nanoseconds: 1_000_000)
-                    }
-                    return self.generateDeterministicSignal(sampleCount: 8000)
-                }
-            )
-        }
-
-        task.cancel()
+        let videos = urls.map { ($0, 128_000) }
 
         do {
-            _ = try await task.value
+            _ = try await withThrowingTaskGroup(of: AudioSyncOutput.self) { group in
+                group.addTask {
+                    try await Self.cancellableSync(videos: videos)
+                }
+                group.cancelAll()
+                return try await group.next()
+            }
             XCTFail("Cancelled sync should throw")
         } catch is CancellationError {
             // Expected.
@@ -400,7 +392,7 @@ final class AudioSyncTests: XCTestCase {
     }
 
     /// Generate deterministic broadband samples for unambiguous correlation.
-    private func generateDeterministicSignal(sampleCount: Int) -> [Float] {
+    private static func generateDeterministicSignal(sampleCount: Int) -> [Float] {
         var state: UInt64 = 0x1234_5678_9ABC_DEF0
         var samples = [Float]()
         samples.reserveCapacity(sampleCount)
@@ -413,5 +405,22 @@ final class AudioSyncTests: XCTestCase {
         }
 
         return samples
+    }
+
+    /// Runs a cancellable sync operation for cancellation propagation tests.
+    ///
+    /// - Parameter videos: Video inputs for the sync engine.
+    /// - Returns: Sync output if the operation is not cancelled.
+    private static func cancellableSync(videos: [(url: URL, audioBitrate: Int)]) async throws -> AudioSyncOutput {
+        try await AudioSyncEngine.sync(
+            videos: videos,
+            audioProvider: { _, _ in
+                for _ in 0 ..< 1000 {
+                    try Task.checkCancellation()
+                    try await Task.sleep(nanoseconds: 1_000_000)
+                }
+                return Self.generateDeterministicSignal(sampleCount: 8000)
+            }
+        )
     }
 }
