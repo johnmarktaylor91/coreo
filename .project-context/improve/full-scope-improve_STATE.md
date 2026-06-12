@@ -71,6 +71,11 @@ wave1_spec: /tmp/PROMPT_coreo_wave1_sync_import.md (written, NOT yet dispatched 
   lint/format configs+sweep, Crop full-body+batch API+parallel import, a11y,
   frame-step/mirror/per-angle-mute) dispatched pid=11703 log=/tmp/coreo_wave6.log,
   spec /tmp/PROMPT_coreo_wave6_quality_taste.md. phase: wave-6-running
+- 00:55: Wave 6 DONE (db0f83f style + 9210e15 feat). Tier 3 gates verified by
+  architect: 116/0 tests, swiftlint 0 errors, swiftformat clean, attribution
+  clean, no doc touches. FF-merged to main, branch deleted, artifacts committed
+  (fe5e000), pushed to origin. SUMMARY.md written. JMT iMessaged. Gate file all
+  PASS. phase: DONE
 
 - 2026-06-11 19:01 EDT: Kickoff fired. Preflight clean (no sentinels, 96GB disk).
   Baseline commit f23d5fa. Full-suite test baseline launched in background.

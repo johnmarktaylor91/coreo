@@ -1,12 +1,13 @@
 {
   "mode": "autonomous",
   "started": "2026-06-11T19:35:00-04:00",
+  "completed": "2026-06-12T00:55:00-04:00",
   "user_directive": "Plz proceed autonomously thx (full-scope improve run, authorized 18:16; merge to main when green; text when done)",
   "exit_criteria": [
-    {"criterion": "All 6 implementation waves landed or 3-strike residual documented", "target": "6/6 waves", "status": "untested", "measured_value": "0/6", "measurement_source": "git log on codex/full-scope-improvements + STATE.md iteration log"},
-    {"criterion": "Full test suite green (no regressions vs recorded baseline)", "target": "0 unexpected failures", "status": "blocked", "measured_value": "platform download in progress", "measurement_source": "/tmp/coreo_baseline_tests.log + per-wave test runs"},
-    {"criterion": "Build green on main after merge", "target": "BUILD SUCCEEDED", "status": "untested", "measured_value": "", "measurement_source": "xcodebuild build on main post-merge"},
-    {"criterion": "SUMMARY.md + TABLED.md written", "target": "both exist", "status": "fail", "measured_value": "TABLED.md only", "measurement_source": "ls .project-context/improve/"},
-    {"criterion": "JMT texted via send-to-jmt.sh", "target": "sent", "status": "fail", "measured_value": "", "measurement_source": "iteration log"}
+    {"criterion": "All 6 implementation waves landed or 3-strike residual documented", "target": "6/6 waves", "status": "pass", "measured_value": "6/6 waves + 1 fixup, commits 2d59156..9210e15", "measurement_source": "git log main"},
+    {"criterion": "Full test suite green (no regressions vs recorded baseline)", "target": "0 unexpected failures", "status": "pass", "measured_value": "116 tests / 0 failures (baseline was 76/5)", "measurement_source": "/tmp/coreo_final_gate.log"},
+    {"criterion": "Build green on main after merge", "target": "BUILD SUCCEEDED", "status": "pass", "measured_value": "ff-merge: identical tree to gate-verified branch tip; swiftlint 0 errors; swiftformat clean", "measurement_source": "/tmp/coreo_final_gate.log + lint runs"},
+    {"criterion": "SUMMARY.md + TABLED.md written", "target": "both exist", "status": "pass", "measured_value": "both committed in fe5e000", "measurement_source": "ls .project-context/improve/"},
+    {"criterion": "JMT texted via send-to-jmt.sh", "target": "sent", "status": "pass", "measured_value": "sent 00:55", "measurement_source": "iteration log"}
   ]
 }
