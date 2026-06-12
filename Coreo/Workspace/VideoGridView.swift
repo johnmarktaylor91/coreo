@@ -6,6 +6,7 @@
 // auto-calculated optimal layout. Panels that are outside their
 // video's time range show an inactive overlay.
 
+import AVFoundation
 import SwiftUI
 
 /// The split-screen video grid. Positions one VideoPanelView per video
@@ -13,36 +14,32 @@ import SwiftUI
 /// panel overrides.
 struct VideoGridView: View {
     /// Workspace view model that owns the players and project state.
-    @ObservedObject var viewModel: WorkspaceViewModel
+    let viewModel: WorkspaceViewModel
+
+    /// Playback controller that owns playhead state and players.
+    let playback: PlaybackController
 
     /// Available container size passed in from the parent GeometryReader.
     let containerSize: CGSize
 
     var body: some View {
-        let rects = panelRects
+        let rects = viewModel.panelRects(containerSize: containerSize)
 
         ZStack(alignment: .topLeading) {
             // Dark background visible in the gaps between panels.
             Color(red: 0.1, green: 0.1, blue: 0.1)
 
             ForEach(Array(viewModel.project.videos.enumerated()), id: \.element.id) { index, _ in
-                if index < rects.count, index < viewModel.players.count {
+                if index < rects.count, index < playback.players.count {
                     let rect = rects[index]
-                    let isActive = viewModel.isVideoActive(
-                        index: index,
-                        at: viewModel.currentTimeSeconds
-                    )
-                    let label = viewModel.inactiveLabel(
-                        forIndex: index,
-                        at: viewModel.currentTimeSeconds
-                    )
                     let cropRect = viewModel.project.videos[index].effectiveCropRect
 
-                    VideoPanelView(
-                        player: viewModel.players[index],
+                    ActiveVideoPanelView(
+                        viewModel: viewModel,
+                        playback: playback,
+                        player: playback.players[index],
+                        index: index,
                         cropRect: cropRect,
-                        isActive: isActive,
-                        inactiveLabel: label,
                         syncStatusLabel: viewModel.syncStatusLabel(for: index),
                         onNudgeSync: { delta in
                             viewModel.nudgeSyncOffset(index: index, deltaSeconds: delta)
@@ -58,36 +55,40 @@ struct VideoGridView: View {
         }
         .frame(width: containerSize.width, height: containerSize.height)
     }
+}
 
-    // MARK: - Layout Calculation
+/// Leaf panel wrapper that is allowed to read playhead state.
+private struct ActiveVideoPanelView: View {
+    /// Parent workspace model for timeline helpers.
+    let viewModel: WorkspaceViewModel
 
-    /// Returns panel rects, preferring user overrides when available.
-    /// User overrides are stored as normalized (0-1) rects and scaled
-    /// to the current container size.
-    private var panelRects: [CGRect] {
-        let manualOverrides = viewModel.project.videos.compactMap(\.panelRectOverride)
-        if manualOverrides.count == viewModel.project.videos.count {
-            return manualOverrides.map { normalized in
-                CGRect(
-                    x: normalized.origin.x * containerSize.width,
-                    y: normalized.origin.y * containerSize.height,
-                    width: normalized.size.width * containerSize.width,
-                    height: normalized.size.height * containerSize.height
-                )
-            }
-        }
+    /// Playback controller that owns the ticking playhead.
+    let playback: PlaybackController
 
-        // Auto-calculate using LayoutEngine.
-        let aspectRatios: [CGFloat] = viewModel.project.videos.map { video in
-            guard video.dimensions.height > 0 else { return 16.0 / 9.0 }
-            return video.dimensions.width / video.dimensions.height
-        }
+    /// Player for this panel.
+    let player: AVPlayer
 
-        return LayoutEngine.calculateLayout(
-            videoCount: viewModel.project.videos.count,
-            aspectRatios: aspectRatios,
-            containerSize: containerSize,
-            gap: 4
+    /// Video index.
+    let index: Int
+
+    /// Effective crop rectangle for the video.
+    let cropRect: CGRect?
+
+    /// Compact sync status label.
+    let syncStatusLabel: String
+
+    /// Sync nudge callback.
+    let onNudgeSync: (Double) -> Void
+
+    var body: some View {
+        let currentTimeSeconds = playback.currentTimeSeconds
+        VideoPanelView(
+            player: player,
+            cropRect: cropRect,
+            isActive: viewModel.isVideoActive(index: index, at: currentTimeSeconds),
+            inactiveLabel: viewModel.inactiveLabel(forIndex: index, at: currentTimeSeconds),
+            syncStatusLabel: syncStatusLabel,
+            onNudgeSync: onNudgeSync
         )
     }
 }

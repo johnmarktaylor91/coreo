@@ -19,7 +19,10 @@ import SwiftUI
 /// - Visual overlay of existing segments (orange = slow, red = hold, green = fast)
 struct SpeedControlView: View {
     /// The workspace view model owning the project and timeline state.
-    @ObservedObject var viewModel: WorkspaceViewModel
+    let viewModel: WorkspaceViewModel
+
+    /// Playback controller for mini-timeline playhead and seeking.
+    let playback: PlaybackController
 
     /// Whether the user is currently dragging to select a range.
     @State private var isSelectingRange: Bool = false
@@ -52,7 +55,7 @@ struct SpeedControlView: View {
         ("0.75x", 0.75),
         ("1x", 1.0),
         ("1.5x", 1.5),
-        ("2x", 2.0)
+        ("2x", 2.0),
     ]
 
     /// Available hold duration presets.
@@ -60,7 +63,7 @@ struct SpeedControlView: View {
         ("Hold 1s", 1.0),
         ("Hold 2s", 2.0),
         ("Hold 3s", 3.0),
-        ("Hold 5s", 5.0)
+        ("Hold 5s", 5.0),
     ]
 
     // MARK: - Body
@@ -131,7 +134,7 @@ struct SpeedControlView: View {
 
                 // Playhead indicator
                 let playheadX = xPosition(
-                    for: viewModel.currentTimeSeconds,
+                    for: playback.currentTimeSeconds,
                     in: width
                 )
                 Rectangle()
@@ -147,17 +150,16 @@ struct SpeedControlView: View {
     // MARK: - Existing Segment Overlays
 
     /// Renders colored overlays for each existing speed segment on the timeline strip.
-    @ViewBuilder
     private func existingSegmentOverlays(width: CGFloat) -> some View {
         ForEach(viewModel.project.speedSegments) { segment in
-            let x = xPosition(for: segment.startTimeSeconds, in: width)
+            let startX = xPosition(for: segment.startTimeSeconds, in: width)
             let endX = xPosition(for: segment.endTimeSeconds, in: width)
-            let segWidth = max(endX - x, 2)
+            let segWidth = max(endX - startX, 2)
 
             RoundedRectangle(cornerRadius: 2)
                 .fill(colorForSegment(segment).opacity(0.35))
                 .frame(width: segWidth, height: 36)
-                .offset(x: x)
+                .offset(x: startX)
                 .allowsHitTesting(false)
         }
     }
@@ -391,7 +393,7 @@ struct SpeedControlView: View {
         let segment = SpeedSegment(
             id: UUID(),
             startTimeSeconds: rangeStart,
-            durationSeconds: 0.01,  // minimal footprint on the timeline
+            durationSeconds: 0.01, // minimal footprint on the timeline
             rate: 0.0,
             holdDurationSeconds: duration
         )
@@ -442,12 +444,12 @@ struct SpeedControlView: View {
     /// Converts an x-coordinate to a timeline position, clamped to bounds.
     ///
     /// - Parameters:
-    ///   - x: The x-coordinate.
+    ///   - xPosition: The x-coordinate.
     ///   - width: Available drawing width.
     /// - Returns: Timeline position in seconds.
-    private func seconds(for x: CGFloat, in width: CGFloat) -> Double {
+    private func seconds(for xPosition: CGFloat, in width: CGFloat) -> Double {
         guard width > 0 else { return viewModel.project.timelineStartSeconds }
-        let fraction = Double(x / width)
+        let fraction = Double(xPosition / width)
         let clamped = min(max(fraction, 0), 1)
         let start = viewModel.project.timelineStartSeconds
         let duration = viewModel.project.timelineDurationSeconds

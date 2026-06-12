@@ -10,18 +10,24 @@ import SwiftUI
 /// Horizontal playback controls: time display, play/pause, speed picker.
 struct PlaybackControlsView: View {
     /// Workspace view model for playback state and actions.
-    @ObservedObject var viewModel: WorkspaceViewModel
+    let viewModel: WorkspaceViewModel
+
+    /// Playback controller for state and actions.
+    let playback: PlaybackController
 
     var body: some View {
         HStack(spacing: 0) {
             // MARK: Left — Time Display
+
             timeDisplay
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             // MARK: Center — Play/Pause
+
             playPauseButton
 
             // MARK: Right — Speed Picker
+
             speedButton
                 .frame(maxWidth: .infinity, alignment: .trailing)
         }
@@ -35,9 +41,9 @@ struct PlaybackControlsView: View {
     /// Shows "current / total" formatted time.
     private var timeDisplay: some View {
         Text(
-            "\(TimeFormatting.formatShort(viewModel.currentTimeSeconds))"
-            + " / "
-            + "\(TimeFormatting.formatShort(viewModel.timelineDuration))"
+            "\(TimeFormatting.formatShort(playback.currentTimeSeconds))"
+                + " / "
+                + "\(TimeFormatting.formatShort(viewModel.timelineDuration))"
         )
         .font(.system(.caption, design: .monospaced))
         .foregroundColor(CoreoColor.textSecondary)
@@ -51,7 +57,7 @@ struct PlaybackControlsView: View {
             Haptic.light()
             viewModel.togglePlayback()
         } label: {
-            Image(systemName: viewModel.isPlaying ? "pause.fill" : "play.fill")
+            Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill")
                 .font(.title2)
                 .foregroundColor(.white)
                 .frame(width: 44, height: 44)
@@ -63,17 +69,20 @@ struct PlaybackControlsView: View {
     // MARK: - Speed Picker
 
     /// Speed indicator that opens a horizontal picker on tap.
+    @ViewBuilder
     private var speedButton: some View {
+        @Bindable var bindablePlayback = playback
+
         Button {
             Haptic.tick()
             withAnimation(CoreoAnimation.standard) {
-                viewModel.isSpeedPickerVisible.toggle()
+                playback.isSpeedPickerVisible.toggle()
             }
         } label: {
             Text(speedLabel)
                 .font(.system(.caption, design: .monospaced))
                 .fontWeight(.semibold)
-                .foregroundColor(viewModel.playbackRate == 1.0 ? CoreoColor.textSecondary : CoreoColor.accent)
+                .foregroundColor(playback.playbackRate == 1.0 ? CoreoColor.textSecondary : CoreoColor.accent)
                 .frame(minWidth: 44, minHeight: 44)
                 .background(
                     RoundedRectangle(cornerRadius: CornerRadius.medium)
@@ -81,7 +90,7 @@ struct PlaybackControlsView: View {
                 )
         }
         .buttonStyle(.coreo)
-        .popover(isPresented: $viewModel.isSpeedPickerVisible) {
+        .popover(isPresented: $bindablePlayback.isSpeedPickerVisible) {
             speedPickerContent
                 .frame(width: 260, height: 52)
         }
@@ -89,7 +98,7 @@ struct PlaybackControlsView: View {
 
     /// Formatted speed label (e.g., "1x", "0.5x").
     private var speedLabel: String {
-        let rate = viewModel.playbackRate
+        let rate = playback.playbackRate
         if rate == Float(Int(rate)) {
             return "\(Int(rate))x"
         }
@@ -99,11 +108,11 @@ struct PlaybackControlsView: View {
     /// Horizontal row of speed options shown in the popover.
     private var speedPickerContent: some View {
         HStack(spacing: Spacing.md) {
-            ForEach(WorkspaceViewModel.availableRates, id: \.self) { rate in
+            ForEach(PlaybackController.availableRates, id: \.self) { rate in
                 Button {
                     Haptic.tick()
-                    viewModel.setPlaybackRate(rate)
-                    viewModel.isSpeedPickerVisible = false
+                    playback.setPlaybackRate(rate)
+                    playback.isSpeedPickerVisible = false
                 } label: {
                     let label: String = {
                         if rate == Float(Int(rate)) {
@@ -114,16 +123,16 @@ struct PlaybackControlsView: View {
 
                     Text(label)
                         .font(.system(.body, design: .monospaced))
-                        .fontWeight(rate == viewModel.playbackRate ? .bold : .regular)
-                        .foregroundColor(rate == viewModel.playbackRate ? CoreoColor.accent : .white)
+                        .fontWeight(rate == playback.playbackRate ? .bold : .regular)
+                        .foregroundColor(rate == playback.playbackRate ? CoreoColor.accent : .white)
                         .frame(minHeight: 36)
                         .padding(.horizontal, Spacing.sm)
                         .background(
                             RoundedRectangle(cornerRadius: CornerRadius.medium)
                                 .fill(
-                                    rate == viewModel.playbackRate
-                                    ? CoreoColor.accent.opacity(0.15)
-                                    : Color.clear
+                                    rate == playback.playbackRate
+                                        ? CoreoColor.accent.opacity(0.15)
+                                        : Color.clear
                                 )
                         )
                 }

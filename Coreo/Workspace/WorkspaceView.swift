@@ -11,7 +11,7 @@ import SwiftUI
 /// The main workspace screen. Owns the WorkspaceViewModel and composes
 /// the video grid, playback controls, edit tools, and timeline.
 struct WorkspaceView: View {
-    @StateObject private var viewModel: WorkspaceViewModel
+    @State private var viewModel: WorkspaceViewModel
     @Environment(\.dismiss) private var dismiss
 
     /// Coral accent used for interactive elements.
@@ -24,15 +24,19 @@ struct WorkspaceView: View {
     ///
     /// - Parameter project: A fully-synced CoreoProject ready for playback.
     init(project: CoreoProject) {
-        _viewModel = StateObject(wrappedValue: WorkspaceViewModel(project: project))
+        _viewModel = State(wrappedValue: WorkspaceViewModel(project: project))
     }
 
     var body: some View {
+        @Bindable var bindableExport = viewModel.export
+
         VStack(spacing: 0) {
             // MARK: Top Bar
+
             topBar
 
             // MARK: Edit Tools (expandable)
+
             if viewModel.isEditToolsVisible {
                 editToolsPanel
                     .transition(.move(edge: .top).combined(with: .opacity))
@@ -43,14 +47,16 @@ struct WorkspaceView: View {
             }
 
             // MARK: Video Grid
+
             GeometryReader { geometry in
                 ZStack {
                     VideoGridView(
                         viewModel: viewModel,
+                        playback: viewModel.playback,
                         containerSize: geometry.size
                     )
 
-                    if let hold = viewModel.activeHoldEvent {
+                    if let hold = viewModel.playback.activeHoldEvent {
                         holdIndicator(hold)
                     }
 
@@ -58,6 +64,8 @@ struct WorkspaceView: View {
                     if viewModel.isAnnotationMode {
                         AnnotationOverlayView(
                             viewModel: viewModel,
+                            annotationStore: viewModel.annotations,
+                            playback: viewModel.playback,
                             containerSize: geometry.size
                         )
                     }
@@ -65,28 +73,31 @@ struct WorkspaceView: View {
             }
 
             // MARK: Speed Control (expandable)
+
             if viewModel.isSpeedControlVisible {
-                SpeedControlView(viewModel: viewModel)
+                SpeedControlView(viewModel: viewModel, playback: viewModel.playback)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
 
             // MARK: Playback Controls
-            PlaybackControlsView(viewModel: viewModel)
+
+            PlaybackControlsView(viewModel: viewModel, playback: viewModel.playback)
 
             // MARK: Timeline
-            TimelineView(viewModel: viewModel)
+
+            TimelineView(viewModel: viewModel, playback: viewModel.playback)
                 .padding(.horizontal, 8)
                 .padding(.bottom, 4)
         }
         .background(bgColor.ignoresSafeArea())
         .navigationBarBackButtonHidden(true)
-        .statusBarHidden(viewModel.isPlaying && !viewModel.isEditToolsVisible)
+        .statusBarHidden(viewModel.playback.isPlaying && !viewModel.isEditToolsVisible)
         .animation(.easeInOut(duration: 0.25), value: viewModel.isEditToolsVisible)
         .animation(.easeInOut(duration: 0.25), value: viewModel.isAnnotationMode)
         .overlay {
-            if viewModel.isExporting {
+            if viewModel.export.isExporting {
                 ExportProgressView(
-                    progress: viewModel.exportProgress,
+                    progress: viewModel.export.exportProgress,
                     onCancel: { viewModel.cancelExport() }
                 )
             }
@@ -94,20 +105,20 @@ struct WorkspaceView: View {
         .onDisappear {
             viewModel.tearDown()
         }
-        .sheet(isPresented: $viewModel.showShareSheet, onDismiss: {
+        .sheet(isPresented: $bindableExport.showShareSheet, onDismiss: {
             viewModel.cleanUpExportedFile()
         }) {
-            if let url = viewModel.exportedVideoURL {
+            if let url = viewModel.export.exportedVideoURL {
                 ShareSheetView(activityItems: [url])
             }
         }
         .alert("Export Failed", isPresented: .init(
-            get: { viewModel.exportError != nil },
-            set: { if !$0 { viewModel.exportError = nil } }
+            get: { viewModel.export.exportError != nil },
+            set: { if !$0 { bindableExport.exportError = nil } }
         )) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text(viewModel.exportError ?? "")
+            Text(viewModel.export.exportError ?? "")
         }
     }
 
@@ -119,7 +130,7 @@ struct WorkspaceView: View {
             // Back button
             Button {
                 Haptic.light()
-                if viewModel.isPlaying {
+                if viewModel.playback.isPlaying {
                     viewModel.togglePlayback()
                 }
                 dismiss()
@@ -152,8 +163,8 @@ struct WorkspaceView: View {
                 }
             } label: {
                 Image(systemName: viewModel.isEditToolsVisible
-                      ? "pencil.circle.fill"
-                      : "pencil.circle")
+                    ? "pencil.circle.fill"
+                    : "pencil.circle")
                     .font(.title3)
                     .foregroundColor(
                         viewModel.isEditToolsVisible ? accentCoral : .white.opacity(0.8)
@@ -170,12 +181,12 @@ struct WorkspaceView: View {
             } label: {
                 Image(systemName: "square.and.arrow.up")
                     .font(.title3)
-                    .foregroundColor(viewModel.isExporting ? .white.opacity(0.35) : .white.opacity(0.8))
+                    .foregroundColor(viewModel.export.isExporting ? .white.opacity(0.35) : .white.opacity(0.8))
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.coreoToolbar)
-            .disabled(viewModel.isExporting)
+            .disabled(viewModel.export.isExporting)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
@@ -185,13 +196,17 @@ struct WorkspaceView: View {
     // MARK: - Edit Tools Panel
 
     /// Expandable panel with annotation, speed, audio, and sync tools.
+    @ViewBuilder
     private var editToolsPanel: some View {
+        @Bindable var bindableViewModel = viewModel
+        @Bindable var bindableAnnotations = viewModel.annotations
+
         VStack(spacing: Spacing.md) {
             // Row 1: Annotation tools
             AnnotationToolbar(
                 viewModel: viewModel,
-                selectedTool: $viewModel.selectedAnnotationTool,
-                selectedColorHex: $viewModel.selectedAnnotationColorHex
+                selectedTool: $bindableAnnotations.selectedAnnotationTool,
+                selectedColorHex: $bindableAnnotations.selectedAnnotationColorHex
             )
 
             Divider().background(Color.white.opacity(0.15))
@@ -202,7 +217,7 @@ struct WorkspaceView: View {
                 Button {
                     Haptic.tick()
                     withAnimation(CoreoAnimation.standard) {
-                        viewModel.isSpeedControlVisible.toggle()
+                        bindableViewModel.isSpeedControlVisible.toggle()
                     }
                 } label: {
                     Label("Speed", systemImage: "gauge.medium")
@@ -330,17 +345,20 @@ struct WorkspaceView: View {
     }
 
     /// Picker for export aspect ratio (landscape/portrait/square).
+    @ViewBuilder
     private var exportAspectPicker: some View {
+        @Bindable var bindableExport = viewModel.export
+
         Menu {
             ForEach(ExportAspectRatio.allCases) { ratio in
                 Button {
                     Haptic.tick()
-                    viewModel.exportAspectRatio = ratio
+                    bindableExport.exportAspectRatio = ratio
                 } label: {
                     HStack {
                         Image(systemName: ratio.iconName)
                         Text(ratio.rawValue)
-                        if ratio == viewModel.exportAspectRatio {
+                        if ratio == viewModel.export.exportAspectRatio {
                             Image(systemName: "checkmark")
                         }
                     }
@@ -348,8 +366,8 @@ struct WorkspaceView: View {
             }
         } label: {
             HStack(spacing: Spacing.xs) {
-                Image(systemName: viewModel.exportAspectRatio.iconName)
-                Text(viewModel.exportAspectRatio.rawValue)
+                Image(systemName: viewModel.export.exportAspectRatio.iconName)
+                Text(viewModel.export.exportAspectRatio.rawValue)
             }
             .font(.caption)
             .foregroundColor(.white.opacity(0.7))

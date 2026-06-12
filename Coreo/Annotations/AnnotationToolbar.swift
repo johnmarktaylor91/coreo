@@ -45,7 +45,7 @@ enum AnnotationTool: String, CaseIterable {
 /// The selected tool is highlighted with a coral accent underline.
 struct AnnotationToolbar: View {
     /// The workspace view model for exiting annotation mode.
-    @ObservedObject var viewModel: WorkspaceViewModel
+    let viewModel: WorkspaceViewModel
 
     /// The currently selected drawing tool.
     @Binding var selectedTool: AnnotationTool

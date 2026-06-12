@@ -14,6 +14,7 @@
 		0EAE865536F349288705D643 /* VideoGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAC4621903D1097792D1D1FA /* VideoGridView.swift */; };
 		168515ECCA30A987484393C2 /* ExportSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B40B7EB935411EB76E3A8C90 /* ExportSettings.swift */; };
 		16E4C26022BB6A2ABE8910AC /* AnnotationToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD3BC9669CA59FFAF4E59395 /* AnnotationToolbar.swift */; };
+		17FBF3A7FF4AF0CA8F431CAF /* LayoutCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49A4B8CEB51F38633802AE71 /* LayoutCache.swift */; };
 		18598DB64C3F3AAFF0D0AAC8 /* SpeedControlView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 848F2882E6ABE131985BA616 /* SpeedControlView.swift */; };
 		295731025BB8BE4D3513B326 /* AnnotationModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58CB611F8B2FB596771CBDD3 /* AnnotationModelTests.swift */; };
 		33F9F333682AD1B93A1EEFBA /* WorkspaceViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B13FCA690B97E07BFB0CB2FF /* WorkspaceViewModel.swift */; };
@@ -28,7 +29,9 @@
 		57FF4F413AAC4D2EA45A2221 /* SmartCropEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA3F56FF03AC7ED3BD5A061E /* SmartCropEngine.swift */; };
 		5A9F5E4493A2C56430611A18 /* AudioSyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 223469245EACB17245F7C142 /* AudioSyncTests.swift */; };
 		5BB621D71435C829F4CD4410 /* TimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA8718750B9BDC0A9915EA7C /* TimelineView.swift */; };
+		6280CB77CCC1184E7E2E59E5 /* AnnotationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A25F48455C6D084E8551311E /* AnnotationStore.swift */; };
 		66CDA9BD93FFD419CD5DB230 /* CoreoProject.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96B4D40807A1C61DCC01B373 /* CoreoProject.swift */; };
+		770AFA9C1C806621B179F3D2 /* PlaybackController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ADB25DE9C60FFB45901D583 /* PlaybackController.swift */; };
 		7800F9B14B302F9FF3795F67 /* ImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67B4833D4AEB1C54181B78FC /* ImportView.swift */; };
 		79D0769EBC3E5510C130EC19 /* CoreoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77156C7733C0AB696540D574 /* CoreoApp.swift */; };
 		79F68515F52DE6E991524427 /* CoreoButtonStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = BED2760714AD7D1641791886 /* CoreoButtonStyle.swift */; };
@@ -36,6 +39,7 @@
 		8872A8A83B47B27015CC73E4 /* HoldPlaybackCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D3BF7B072CCC0B9693CFCF6 /* HoldPlaybackCoordinator.swift */; };
 		8A64B0C33D0259F54852A629 /* AnnotationCompositor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68D54D077EAC1686114A6DAF /* AnnotationCompositor.swift */; };
 		8D3278A333338F724ED712B3 /* TimeMapperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A89F0A47A1720B4CBB0E639D /* TimeMapperTests.swift */; };
+		90ACD02A135EC02912188679 /* ExportCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75687BB4CF8220F5B8FC3551 /* ExportCoordinator.swift */; };
 		92BA69E569DF6E031021035D /* AnnotationModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BED948F29AE6FF994F0B4A3A /* AnnotationModel.swift */; };
 		9554A3BA9356CA081B450B95 /* AudioExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 075B7749F6E89720F392BF19 /* AudioExtractor.swift */; };
 		99DC36ED891777F069FF83EF /* ShareSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17B8CFC4DEB21BBD5B041638 /* ShareSheetView.swift */; };
@@ -89,6 +93,7 @@
 		2E9CB7C84D4318E8BDDE7415 /* CoreoTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = CoreoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		3441C765B2B441458DBF388E /* ExportPlanTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportPlanTests.swift; sourceTree = "<group>"; };
 		47513E4279EAAB51B7A2EF2E /* PlaybackCoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackCoreTests.swift; sourceTree = "<group>"; };
+		49A4B8CEB51F38633802AE71 /* LayoutCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayoutCache.swift; sourceTree = "<group>"; };
 		524202D1ED4345FE4213C721 /* Coreo.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Coreo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		58CB611F8B2FB596771CBDD3 /* AnnotationModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationModelTests.swift; sourceTree = "<group>"; };
 		5AD1ADC5FF63295B2FCD6D6E /* VideoAsset.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoAsset.swift; sourceTree = "<group>"; };
@@ -99,6 +104,7 @@
 		67B4833D4AEB1C54181B78FC /* ImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportView.swift; sourceTree = "<group>"; };
 		68D54D077EAC1686114A6DAF /* AnnotationCompositor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationCompositor.swift; sourceTree = "<group>"; };
 		6D3BF7B072CCC0B9693CFCF6 /* HoldPlaybackCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HoldPlaybackCoordinator.swift; sourceTree = "<group>"; };
+		75687BB4CF8220F5B8FC3551 /* ExportCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportCoordinator.swift; sourceTree = "<group>"; };
 		77156C7733C0AB696540D574 /* CoreoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreoApp.swift; sourceTree = "<group>"; };
 		78F1A7D9A2CAB2FD38866CB5 /* TimeFormatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeFormatting.swift; sourceTree = "<group>"; };
 		836D9C50D78CB209852F60F1 /* LayoutEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayoutEngineTests.swift; sourceTree = "<group>"; };
@@ -110,9 +116,11 @@
 		967070AE92BF269CB742DE76 /* TimeMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeMapper.swift; sourceTree = "<group>"; };
 		96B4D40807A1C61DCC01B373 /* CoreoProject.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreoProject.swift; sourceTree = "<group>"; };
 		97FB09D975CAE1BBC153A72C /* PlayerSyncPlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerSyncPlan.swift; sourceTree = "<group>"; };
+		9ADB25DE9C60FFB45901D583 /* PlaybackController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackController.swift; sourceTree = "<group>"; };
 		9AF6BB6BEEE6C897FF2FCE9F /* LayoutEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayoutEngine.swift; sourceTree = "<group>"; };
 		9E31A7AA8C8E9D9C6DEBEE12 /* EndBumperGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EndBumperGenerator.swift; sourceTree = "<group>"; };
 		9FAFFD4521E9245038C8190E /* ProjectStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectStore.swift; sourceTree = "<group>"; };
+		A25F48455C6D084E8551311E /* AnnotationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationStore.swift; sourceTree = "<group>"; };
 		A27504774982A729418B34BE /* ArrowAnnotationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArrowAnnotationView.swift; sourceTree = "<group>"; };
 		A89F0A47A1720B4CBB0E639D /* TimeMapperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeMapperTests.swift; sourceTree = "<group>"; };
 		A9DD7A94D95FD0BE852551F1 /* FFTHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFTHelper.swift; sourceTree = "<group>"; };
@@ -264,7 +272,11 @@
 		B4B26E87F6BB14D34CBACF0E /* Workspace */ = {
 			isa = PBXGroup;
 			children = (
+				A25F48455C6D084E8551311E /* AnnotationStore.swift */,
+				75687BB4CF8220F5B8FC3551 /* ExportCoordinator.swift */,
 				6D3BF7B072CCC0B9693CFCF6 /* HoldPlaybackCoordinator.swift */,
+				49A4B8CEB51F38633802AE71 /* LayoutCache.swift */,
+				9ADB25DE9C60FFB45901D583 /* PlaybackController.swift */,
 				2E561E3BA7FCBE22CA60373D /* PlaybackControlsView.swift */,
 				97FB09D975CAE1BBC153A72C /* PlayerSyncPlan.swift */,
 				1C1C6D6A6341BD85A4D9923B /* TimelineCoordinateMapper.swift */,
@@ -434,6 +446,7 @@
 				9CC23C6B3A3686085BF2BD34 /* AnnotationMarkerView.swift in Sources */,
 				92BA69E569DF6E031021035D /* AnnotationModel.swift in Sources */,
 				56298196B45A1871D73E4473 /* AnnotationOverlayView.swift in Sources */,
+				6280CB77CCC1184E7E2E59E5 /* AnnotationStore.swift in Sources */,
 				BE179B6B66A6B234E0D08E4D /* AnnotationTimeRangeControl.swift in Sources */,
 				16E4C26022BB6A2ABE8910AC /* AnnotationToolbar.swift in Sources */,
 				419D95B2E7F400E1532695C0 /* ArrowAnnotationView.swift in Sources */,
@@ -446,6 +459,7 @@
 				0DBBB0C8973EE59168E7DBAE /* DesignSystem.swift in Sources */,
 				E1BAC1695127FD33A1EFAFEE /* DocumentPickerView.swift in Sources */,
 				FB37156109108E08EEFA14AF /* EndBumperGenerator.swift in Sources */,
+				90ACD02A135EC02912188679 /* ExportCoordinator.swift in Sources */,
 				394681F90A3007CEC4CE75EB /* ExportEngine.swift in Sources */,
 				9AD6A7E75B59E8C97A47E5AB /* ExportPlan.swift in Sources */,
 				FCE787A0141B8C47CF09B3DF /* ExportProgressView.swift in Sources */,
@@ -456,9 +470,11 @@
 				8872A8A83B47B27015CC73E4 /* HoldPlaybackCoordinator.swift in Sources */,
 				7800F9B14B302F9FF3795F67 /* ImportView.swift in Sources */,
 				5650A40D272153DABC7FEE49 /* ImportViewModel.swift in Sources */,
+				17FBF3A7FF4AF0CA8F431CAF /* LayoutCache.swift in Sources */,
 				D256488305511E5DBCB486AD /* LayoutEngine.swift in Sources */,
 				C9A8E136D4252B14D2D9BF48 /* PanelCompositor.swift in Sources */,
 				025333983E82CCB388C07593 /* PersonDetector.swift in Sources */,
+				770AFA9C1C806621B179F3D2 /* PlaybackController.swift in Sources */,
 				AB020E78BA55C8521E0A7E9A /* PlaybackControlsView.swift in Sources */,
 				E42542171136EEB19CEBA1EA /* PlayerSyncPlan.swift in Sources */,
 				408168F1F5086F5662BABB79 /* ProjectStore.swift in Sources */,

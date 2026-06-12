@@ -18,7 +18,10 @@ import SwiftUI
 /// 5. Trim brackets — dim out-of-range regions when trim is active
 struct TimelineView: View {
     /// The workspace view model driving playback and project state.
-    @ObservedObject var viewModel: WorkspaceViewModel
+    let viewModel: WorkspaceViewModel
+
+    /// Playback controller for playhead and scrub actions.
+    let playback: PlaybackController
 
     /// Total height of the timeline bar.
     let height: CGFloat = 80
@@ -71,7 +74,7 @@ struct TimelineView: View {
 
                     // 4. Annotation markers
                     AnnotationMarkerView(
-                        annotations: viewModel.project.annotations,
+                        annotations: viewModel.annotations.annotations,
                         timelineStart: timelineStart,
                         timelineDuration: timelineDuration,
                         onTapAnnotation: { annotation in
@@ -216,7 +219,7 @@ struct TimelineView: View {
                 .fill(Color.black.opacity(0.4))
 
             // Played region
-            let playheadX = xPosition(for: viewModel.currentTimeSeconds, in: usableWidth)
+            let playheadX = xPosition(for: playback.currentTimeSeconds, in: usableWidth)
             RoundedRectangle(cornerRadius: 4)
                 .fill(accentCoral.opacity(0.15))
                 .frame(width: max(playheadX, 0))
@@ -249,7 +252,7 @@ struct TimelineView: View {
     /// Current time and total duration labels flanking the scrub area.
     private func timeLabels(width _: CGFloat) -> some View {
         HStack {
-            Text(TimeFormatting.format(viewModel.currentTimeSeconds))
+            Text(TimeFormatting.format(playback.currentTimeSeconds))
                 .font(.system(size: 9, weight: .medium, design: .monospaced))
                 .foregroundColor(.white.opacity(0.6))
 
@@ -266,9 +269,7 @@ struct TimelineView: View {
     /// Dims the timeline regions outside the user's trim range.
     @ViewBuilder
     private func trimOverlay(width: CGFloat) -> some View {
-        if let trimStart = viewModel.project.timelineTrimStartSeconds,
-           let trimDuration = viewModel.project.timelineTrimDurationSeconds
-        {
+        if let trimStart = viewModel.project.timelineTrimStartSeconds, let trimDuration = viewModel.project.timelineTrimDurationSeconds {
             let usableWidth = width - 16 // account for horizontal padding
             let trimEnd = trimStart + trimDuration
 
@@ -319,8 +320,8 @@ struct TimelineView: View {
                 if !isDragging {
                     isDragging = true
                     Haptic.light()
-                    wasPlayingBeforeDrag = viewModel.isPlaying
-                    if viewModel.isPlaying {
+                    wasPlayingBeforeDrag = playback.isPlaying
+                    if playback.isPlaying {
                         viewModel.togglePlayback()
                     }
                 }
@@ -330,8 +331,8 @@ struct TimelineView: View {
             }
             .onEnded { _ in
                 isDragging = false
-                viewModel.seek(to: viewModel.currentTimeSeconds, precise: true)
-                if wasPlayingBeforeDrag && !viewModel.isPlaying {
+                viewModel.seek(to: playback.currentTimeSeconds, precise: true)
+                if wasPlayingBeforeDrag && !playback.isPlaying {
                     viewModel.togglePlayback()
                 }
                 wasPlayingBeforeDrag = false

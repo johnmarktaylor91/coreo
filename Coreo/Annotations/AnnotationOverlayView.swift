@@ -11,7 +11,9 @@ import SwiftUI
 /// Renders visible annotations over the video grid at the current playhead time.
 /// When annotation mode is active, enables creation tools based on the selected tool.
 struct AnnotationOverlayView: View {
-    @ObservedObject var viewModel: WorkspaceViewModel
+    let viewModel: WorkspaceViewModel
+    let annotationStore: AnnotationStore
+    let playback: PlaybackController
     let containerSize: CGSize
 
     /// PencilKit canvas drawing state.
@@ -31,7 +33,7 @@ struct AnnotationOverlayView: View {
             // Render all visible annotations (always, regardless of mode).
             ForEach(visibleAnnotations) { annotation in
                 annotationView(for: annotation)
-                    .opacity(annotation.opacity(at: viewModel.currentTimeSeconds))
+                    .opacity(annotation.opacity(at: playback.currentTimeSeconds))
             }
 
             // Tool-specific interaction layer.
@@ -52,7 +54,7 @@ struct AnnotationOverlayView: View {
 
     @ViewBuilder
     private var toolLayer: some View {
-        switch viewModel.selectedAnnotationTool {
+        switch annotationStore.selectedAnnotationTool {
         case .pencil:
             pencilLayer
         case .text:
@@ -70,7 +72,7 @@ struct AnnotationOverlayView: View {
         ZStack {
             PencilCanvasRepresentable(
                 drawing: $currentDrawing,
-                colorHex: viewModel.selectedAnnotationColorHex
+                colorHex: annotationStore.selectedAnnotationColorHex
             )
             .frame(width: containerSize.width, height: containerSize.height)
 
@@ -142,7 +144,7 @@ struct AnnotationOverlayView: View {
             if let start = arrowDragStart, let current = arrowDragCurrent {
                 ArrowPreviewShape(start: start, end: current)
                     .stroke(
-                        Color(hex: viewModel.selectedAnnotationColorHex),
+                        Color(hex: annotationStore.selectedAnnotationColorHex),
                         lineWidth: 3
                     )
                     .allowsHitTesting(false)
@@ -203,7 +205,7 @@ struct AnnotationOverlayView: View {
     @ViewBuilder
     private func annotationHitArea(for annotation: TimedAnnotation) -> some View {
         switch annotation.content {
-        case .text(let text):
+        case let .text(text):
             let pos = CGPoint(
                 x: text.position.x * containerSize.width,
                 y: text.position.y * containerSize.height
@@ -216,7 +218,7 @@ struct AnnotationOverlayView: View {
                     Haptic.light()
                     viewModel.deleteAnnotation(id: annotation.id)
                 }
-        case .arrow(let arrow):
+        case let .arrow(arrow):
             let mid = CGPoint(
                 x: (arrow.start.x + arrow.end.x) / 2 * containerSize.width,
                 y: (arrow.start.y + arrow.end.y) / 2 * containerSize.height
@@ -244,24 +246,24 @@ struct AnnotationOverlayView: View {
     // MARK: - Annotation Rendering
 
     private var visibleAnnotations: [TimedAnnotation] {
-        viewModel.project.annotations.filter { $0.isVisible(at: viewModel.currentTimeSeconds) }
+        annotationStore.annotations.filter { $0.isVisible(at: playback.currentTimeSeconds) }
     }
 
     @ViewBuilder
     private func annotationView(for annotation: TimedAnnotation) -> some View {
         switch annotation.content {
-        case .drawing(let drawing):
+        case let .drawing(drawing):
             drawingView(for: drawing)
-        case .text(let text):
+        case let .text(text):
             TextAnnotationView(
                 annotation: text,
-                isSelected: viewModel.selectedAnnotationID == annotation.id,
+                isSelected: annotationStore.selectedAnnotationID == annotation.id,
                 onTap: {
                     if viewModel.isAnnotationMode {
-                        if viewModel.selectedAnnotationTool == .eraser {
+                        if annotationStore.selectedAnnotationTool == .eraser {
                             viewModel.deleteAnnotation(id: annotation.id)
                         } else {
-                            viewModel.selectedAnnotationID = annotation.id
+                            annotationStore.selectedAnnotationID = annotation.id
                         }
                     }
                 },
@@ -270,10 +272,10 @@ struct AnnotationOverlayView: View {
                 },
                 containerSize: containerSize
             )
-        case .arrow(let arrow):
+        case let .arrow(arrow):
             ArrowAnnotationView(
                 annotation: arrow,
-                isSelected: viewModel.selectedAnnotationID == annotation.id,
+                isSelected: annotationStore.selectedAnnotationID == annotation.id,
                 containerSize: containerSize
             )
         }
@@ -299,28 +301,28 @@ struct ArrowPreviewShape: Shape {
     let start: CGPoint
     let end: CGPoint
 
-    func path(in rect: CGRect) -> Path {
+    func path(in _: CGRect) -> Path {
         var path = Path()
         path.move(to: start)
         path.addLine(to: end)
 
         // Arrowhead
-        let dx = end.x - start.x
-        let dy = end.y - start.y
-        let length = sqrt(dx * dx + dy * dy)
+        let deltaX = end.x - start.x
+        let deltaY = end.y - start.y
+        let length = sqrt(deltaX * deltaX + deltaY * deltaY)
         guard length > 0 else { return path }
-        let ux = dx / length
-        let uy = dy / length
+        let unitX = deltaX / length
+        let unitY = deltaY / length
         let headLength: CGFloat = 14
         let headWidth: CGFloat = 8
 
         let left = CGPoint(
-            x: end.x - ux * headLength + uy * headWidth / 2,
-            y: end.y - uy * headLength - ux * headWidth / 2
+            x: end.x - unitX * headLength + unitY * headWidth / 2,
+            y: end.y - unitY * headLength - unitX * headWidth / 2
         )
         let right = CGPoint(
-            x: end.x - ux * headLength - uy * headWidth / 2,
-            y: end.y - uy * headLength + ux * headWidth / 2
+            x: end.x - unitX * headLength - unitY * headWidth / 2,
+            y: end.y - unitY * headLength + unitX * headWidth / 2
         )
         path.move(to: end)
         path.addLine(to: left)
@@ -349,7 +351,7 @@ struct PencilCanvasRepresentable: UIViewRepresentable {
         return canvas
     }
 
-    func updateUIView(_ uiView: PKCanvasView, context: Context) {
+    func updateUIView(_ uiView: PKCanvasView, context _: Context) {
         if uiView.drawing != drawing {
             uiView.drawing = drawing
         }
@@ -381,9 +383,9 @@ private extension UIColor {
         let hex = hexString.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
         var rgb: UInt64 = 0
         Scanner(string: hex).scanHexInt64(&rgb)
-        let r = CGFloat((rgb >> 16) & 0xFF) / 255.0
-        let g = CGFloat((rgb >> 8) & 0xFF) / 255.0
-        let b = CGFloat(rgb & 0xFF) / 255.0
-        self.init(red: r, green: g, blue: b, alpha: 1.0)
+        let red = CGFloat((rgb >> 16) & 0xFF) / 255.0
+        let green = CGFloat((rgb >> 8) & 0xFF) / 255.0
+        let blue = CGFloat(rgb & 0xFF) / 255.0
+        self.init(red: red, green: green, blue: blue, alpha: 1.0)
     }
 }
