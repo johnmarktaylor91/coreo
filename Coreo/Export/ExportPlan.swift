@@ -270,8 +270,7 @@ struct ExportPlan {
                 for source in sources {
                     let sourceSeconds = segment.startTimeSeconds - source.syncOffsetSeconds
                     if sourceSeconds >= 0,
-                       sourceSeconds <= CMTimeGetSeconds(source.trackTimeRange.duration)
-                    {
+                       sourceSeconds <= CMTimeGetSeconds(source.trackTimeRange.duration) {
                         edits.append(.freeze(
                             clipIndex: source.index,
                             compositionTime: start,

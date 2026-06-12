@@ -65,10 +65,9 @@ struct PlayerSyncPlan: Equatable {
     /// - Parameter state: Desired state to inspect.
     /// - Returns: Clip-local time as `CMTime`.
     static func cmTime(for state: DesiredState) -> CMTime {
-        let seconds: Double
-        switch state {
+        let seconds: Double = switch state {
         case let .active(clipSeconds, _), let .inactive(clipSeconds, _):
-            seconds = clipSeconds
+            clipSeconds
         }
         return CMTime(seconds: max(0, seconds), preferredTimescale: 600)
     }

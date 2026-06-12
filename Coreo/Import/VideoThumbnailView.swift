@@ -49,8 +49,7 @@ struct VideoThumbnailView: View {
     @ViewBuilder
     private var thumbnailImage: some View {
         if let data = video.thumbnailData,
-           let uiImage = UIImage(data: data)
-        {
+           let uiImage = UIImage(data: data) {
             Image(uiImage: uiImage)
                 .resizable()
                 .aspectRatio(contentMode: .fill)

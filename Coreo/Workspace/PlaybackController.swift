@@ -464,11 +464,10 @@ private extension PlaybackController {
 
             switch state {
             case let .active(_, rate):
-                let wasInactive: Bool
-                if case .inactive = previousState {
-                    wasInactive = true
+                let wasInactive = if case .inactive = previousState {
+                    true
                 } else {
-                    wasInactive = false
+                    false
                 }
                 if forceSeek || wasInactive {
                     player.seek(to: cmTime, toleranceBefore: .zero, toleranceAfter: .zero) { [weak player] _ in

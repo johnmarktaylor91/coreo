@@ -15,7 +15,7 @@ final class PlaybackCoreTests: XCTestCase {
         let secondID = UUID()
         let mapper = TimeMapper(clips: [
             .init(id: firstID, syncOffsetSeconds: 0, durationSeconds: 10),
-            .init(id: secondID, syncOffsetSeconds: 3, durationSeconds: 10),
+            .init(id: secondID, syncOffsetSeconds: 3, durationSeconds: 10)
         ])
 
         let before = PlayerSyncPlan.make(timelineSeconds: 2, mapper: mapper, rate: 1)
@@ -36,7 +36,7 @@ final class PlaybackCoreTests: XCTestCase {
                 durationSeconds: 20,
                 trimStartSeconds: 4,
                 trimDurationSeconds: 6
-            ),
+            )
         ])
 
         let beforeTrim = PlayerSyncPlan.make(timelineSeconds: 5, mapper: mapper, rate: 1)

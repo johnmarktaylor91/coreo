@@ -81,12 +81,12 @@ struct AnnotationMarkerView: View {
     ///   use their stored color hex; drawings default to white.
     private func markerColor(for annotation: TimedAnnotation) -> Color {
         switch annotation.content {
-        case .text(let text):
-            return Color(hex: text.colorHex)
-        case .arrow(let arrow):
-            return Color(hex: arrow.colorHex)
+        case let .text(text):
+            Color(hex: text.colorHex)
+        case let .arrow(arrow):
+            Color(hex: arrow.colorHex)
         case .drawing:
-            return .white
+            .white
         }
     }
 }

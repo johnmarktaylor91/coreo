@@ -203,7 +203,7 @@ enum AnnotationRasterizer {
         let attributes: [NSAttributedString.Key: Any] = [
             .font: font,
             .foregroundColor: UIColor(coreoHex: text.colorHex),
-            .paragraphStyle: paragraph,
+            .paragraphStyle: paragraph
         ]
         let maxTextSize = CGSize(width: destinationSize.width * 0.8, height: destinationSize.height)
         let textSize = (text.text as NSString).boundingRect(
@@ -364,7 +364,7 @@ struct AnnotationExportFrameRenderer: AnnotationFrameRendering {
             }
             let overlay = CIImage(cgImage: cgImage)
                 .applyingFilter("CIColorMatrix", parameters: [
-                    "inputAVector": CIVector(x: 0, y: 0, z: 0, w: opacity),
+                    "inputAVector": CIVector(x: 0, y: 0, z: 0, w: opacity)
                 ])
             result = overlay.composited(over: result)
         }

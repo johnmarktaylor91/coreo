@@ -104,17 +104,17 @@ struct ExportProgressView: View {
     /// Descriptive status text based on progress stage.
     private var statusText: String {
         if clampedProgress < 0.05 {
-            return "Preparing..."
+            "Preparing..."
         } else if clampedProgress < 0.20 {
-            return "Loading videos..."
+            "Loading videos..."
         } else if clampedProgress < 0.35 {
-            return "Building composition..."
+            "Building composition..."
         } else if clampedProgress < 0.45 {
-            return "Adding annotations..."
+            "Adding annotations..."
         } else if clampedProgress < 0.95 {
-            return "Encoding video..."
+            "Encoding video..."
         } else {
-            return "Finalizing..."
+            "Finalizing..."
         }
     }
 }

@@ -10,7 +10,6 @@ import SwiftUI
 /// ViewModel managing video imports and the sync-to-project flow.
 @MainActor
 final class ImportViewModel: ObservableObject {
-
     // MARK: - Published State
 
     /// Videos that have been successfully imported and probed.
@@ -162,9 +161,9 @@ final class ImportViewModel: ObservableObject {
         let results = await importAssets(from: selectedURLs)
         for result in results {
             switch result {
-            case .success(let asset):
+            case let .success(asset):
                 videos.append(asset)
-            case .failure(let failure):
+            case let .failure(failure):
                 recordImportError(
                     filename: failure.url.lastPathComponent,
                     message: failure.error.localizedDescription,
@@ -242,14 +241,13 @@ final class ImportViewModel: ObservableObject {
                 let name = idx < videoSnapshot.count
                     ? videoSnapshot[idx].originalFilename
                     : "Video \(idx)"
-                let reason: String
-                switch result.status {
+                let reason: String = switch result.status {
                 case .synced:
-                    reason = "Low confidence"
+                    "Low confidence"
                 case .noAudio:
-                    reason = "No audio; align manually later"
-                case .failed(let failureReason):
-                    reason = failureReason
+                    "No audio; align manually later"
+                case let .failed(failureReason):
+                    failureReason
                 }
                 return UnreliableVideo(
                     index: idx,
@@ -413,7 +411,7 @@ final class ImportViewModel: ObservableObject {
         await withTaskGroup(of: (Int, Result<VideoAsset, ImportFailure>).self) { group in
             var nextIndex = 0
             var activeCount = 0
-            var results = Array<Result<VideoAsset, ImportFailure>?>(repeating: nil, count: urls.count)
+            var results = [Result<VideoAsset, ImportFailure>?](repeating: nil, count: urls.count)
 
             func addNextIfPossible() {
                 while activeCount < Self.maxConcurrentImports, nextIndex < urls.count {

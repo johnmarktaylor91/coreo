@@ -208,8 +208,7 @@ struct WorkspaceView: View {
             )
 
             if let selectedID = viewModel.annotations.selectedAnnotationID,
-               annotationExists(id: selectedID)
-            {
+               annotationExists(id: selectedID) {
                 AnnotationTimeRangeControl(
                     startTimeSeconds: timingStartBinding(id: selectedID),
                     durationSeconds: timingDurationBinding(id: selectedID),

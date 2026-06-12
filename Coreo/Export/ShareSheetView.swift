@@ -26,7 +26,7 @@ struct ShareSheetView: UIViewControllerRepresentable {
     ///
     /// - Parameter context: The representable context.
     /// - Returns: A configured UIActivityViewController.
-    func makeUIViewController(context: Context) -> UIActivityViewController {
+    func makeUIViewController(context _: Context) -> UIActivityViewController {
         let controller = UIActivityViewController(
             activityItems: activityItems,
             applicationActivities: nil
@@ -41,8 +41,8 @@ struct ShareSheetView: UIViewControllerRepresentable {
     ///   - uiViewController: The existing controller.
     ///   - context: The representable context.
     func updateUIViewController(
-        _ uiViewController: UIActivityViewController,
-        context: Context
+        _: UIActivityViewController,
+        context _: Context
     ) {
         // Nothing to update after presentation.
     }

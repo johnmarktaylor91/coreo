@@ -5,8 +5,8 @@
 // to an efficient rate for cross-correlation. The 8 kHz default is more than
 // sufficient for music-based sync and keeps FFT sizes small.
 
-import AVFoundation
 import Accelerate
+import AVFoundation
 
 /// Errors that can occur during audio extraction from video.
 enum AudioExtractionError: Error, LocalizedError {
@@ -18,13 +18,13 @@ enum AudioExtractionError: Error, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .noAudioTrack:
-            return "The video file does not contain an audio track."
+            "The video file does not contain an audio track."
         case .readerInitFailed:
-            return "Failed to initialize the audio reader for the video file."
+            "Failed to initialize the audio reader for the video file."
         case .readFailed:
-            return "Failed to read audio samples from the video file."
+            "Failed to read audio samples from the video file."
         case .emptyAudio:
-            return "The audio track contains no samples."
+            "The audio track contains no samples."
         }
     }
 }
@@ -36,7 +36,6 @@ enum AudioExtractionError: Error, LocalizedError {
 /// format conversion and downsampling internally, which is both simpler
 /// and faster than manual resampling with Accelerate.
 enum AudioExtractor {
-
     /// Extract audio from a video asset as a mono PCM float array.
     ///
     /// - Parameters:
@@ -57,7 +56,7 @@ enum AudioExtractor {
         let durationSeconds = CMTimeGetSeconds(duration)
         let estimatedSampleCount = durationSeconds.isFinite && durationSeconds > 0
             ? Int((durationSeconds * targetSampleRate).rounded(.up))
-            : 8_192
+            : 8192
 
         // Configure output format: mono Float32 at the target sample rate.
         let outputSettings: [String: Any] = [
@@ -71,7 +70,7 @@ enum AudioExtractor {
         ]
 
         // Build the reader on a background thread to keep the main thread free.
-        let samples: [Float] = try await Task.detached(priority: .userInitiated) {
+        return try await Task.detached(priority: .userInitiated) {
             let reader: AVAssetReader
             do {
                 reader = try AVAssetReader(asset: asset)
@@ -93,7 +92,7 @@ enum AudioExtractor {
 
             // Read all sample buffers and concatenate into one Float array.
             var allSamples: [Float] = []
-            allSamples.reserveCapacity(max(estimatedSampleCount, 8_192))
+            allSamples.reserveCapacity(max(estimatedSampleCount, 8192))
 
             while reader.status == .reading {
                 try Task.checkCancellation()
@@ -133,8 +132,6 @@ enum AudioExtractor {
 
             return allSamples
         }.value
-
-        return samples
     }
 
     // MARK: - Private

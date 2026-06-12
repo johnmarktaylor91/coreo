@@ -14,11 +14,11 @@ enum ProjectStoreError: Error, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .missingProjectFile:
-            return "Project file is missing."
+            "Project file is missing."
         case .unsupportedSchemaVersion:
-            return "Project file uses an unsupported schema version."
-        case .mediaCopyFailed(let filename):
-            return "Couldn't copy \(filename) into the project."
+            "Project file uses an unsupported schema version."
+        case let .mediaCopyFailed(filename):
+            "Couldn't copy \(filename) into the project."
         }
     }
 }

@@ -17,9 +17,9 @@ enum PersonDetectionError: Error, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .assetLoadFailed:
-            return "Failed to load the video asset for person detection."
+            "Failed to load the video asset for person detection."
         case .noVideoTrack:
-            return "The video file does not contain a video track."
+            "The video file does not contain a video track."
         }
     }
 }
@@ -31,7 +31,6 @@ enum PersonDetectionError: Error, LocalizedError {
 /// boxes in Vision coordinates (normalized 0-1, origin at bottom-left) for
 /// downstream crop computation by ``SmartCropEngine``.
 enum PersonDetector {
-
     /// Detect human bounding boxes in sampled frames from a video.
     ///
     /// - Parameters:
@@ -73,7 +72,7 @@ enum PersonDetector {
         imageGenerator.requestedTimeToleranceAfter = CMTime(seconds: 0.5, preferredTimescale: 600)
 
         // Run detection on a background thread.
-        let detectedRects: [CGRect] = try await Task.detached(priority: .userInitiated) {
+        return try await Task.detached(priority: .userInitiated) {
             var allRects: [CGRect] = []
 
             for sampleTime in sampleTimes {
@@ -99,8 +98,6 @@ enum PersonDetector {
 
             return allRects
         }.value
-
-        return detectedRects
     }
 
     // MARK: - Private
@@ -137,6 +134,6 @@ enum PersonDetector {
             return []
         }
 
-        return observations.map { $0.boundingBox }
+        return observations.map(\.boundingBox)
     }
 }

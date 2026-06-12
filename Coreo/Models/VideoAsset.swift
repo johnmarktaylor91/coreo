@@ -18,13 +18,13 @@ enum VideoAssetError: Error, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .noVideoTrack:
-            return "The file does not contain a video track."
+            "The file does not contain a video track."
         case .noAudioTrack:
-            return "The file does not contain an audio track."
+            "The file does not contain an audio track."
         case .invalidDuration:
-            return "The video has an invalid or unreadable duration."
+            "The video has an invalid or unreadable duration."
         case .thumbnailGenerationFailed:
-            return "Failed to generate a thumbnail image from the video."
+            "Failed to generate a thumbnail image from the video."
         }
     }
 }

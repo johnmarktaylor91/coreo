@@ -9,7 +9,7 @@ final class TimeMapperTests: XCTestCase {
     func testTimelineToClipAndBackWithOffset() throws {
         let clipID = UUID()
         let mapper = TimeMapper(clips: [
-            TimeMapper.Clip(id: clipID, syncOffsetSeconds: 3, durationSeconds: 20),
+            TimeMapper.Clip(id: clipID, syncOffsetSeconds: 3, durationSeconds: 20)
         ])
 
         let clipTime = try XCTUnwrap(mapper.clipTime(forTimeline: 8, clipID: clipID))
@@ -28,7 +28,7 @@ final class TimeMapperTests: XCTestCase {
                 durationSeconds: 20,
                 trimStartSeconds: 4,
                 trimDurationSeconds: 6
-            ),
+            )
         ])
 
         XCTAssertFalse(mapper.isClipActive(atTimeline: 1, clipID: clipID))
@@ -65,7 +65,7 @@ final class TimeMapperTests: XCTestCase {
             clips: [TimeMapper.Clip(syncOffsetSeconds: 0, durationSeconds: 30)],
             speedSegments: [
                 makeSegment(start: 4, duration: 4, rate: 2),
-                makeSegment(start: 10, duration: 0.01, rate: 0, hold: 2),
+                makeSegment(start: 10, duration: 0.01, rate: 0, hold: 2)
             ]
         )
         let annotation = TimedAnnotation(
@@ -98,7 +98,7 @@ final class TimeMapperTests: XCTestCase {
             clips: [TimeMapper.Clip(syncOffsetSeconds: -2, durationSeconds: 32)],
             speedSegments: [
                 makeSegment(start: 10, duration: 10, rate: 0.5),
-                makeSegment(start: 25, duration: 0.01, rate: 0, hold: 2),
+                makeSegment(start: 25, duration: 0.01, rate: 0, hold: 2)
             ]
         )
 

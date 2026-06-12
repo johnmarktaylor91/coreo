@@ -63,17 +63,17 @@ enum LayoutEngine {
     private static func layoutVariants(for count: Int) -> [[Int]] {
         switch count {
         case 2:
-            return [[2]]           // side by side
+            [[2]] // side by side
         case 3:
-            return [[1, 2], [2, 1]]
+            [[1, 2], [2, 1]]
         case 4:
-            return [[2, 2]]        // 2x2 grid
+            [[2, 2]] // 2x2 grid
         case 5:
-            return [[2, 3], [3, 2]]
+            [[2, 3], [3, 2]]
         case 6:
-            return [[3, 3], [2, 2, 2]]
+            [[3, 3], [2, 2, 2]]
         default:
-            return []
+            []
         }
     }
 
@@ -94,7 +94,7 @@ enum LayoutEngine {
         var rects: [CGRect] = []
         var currentY: CGFloat = 0
 
-        for rowIndex in 0..<rowConfig.count {
+        for rowIndex in 0 ..< rowConfig.count {
             let panelsInRow = CGFloat(rowConfig[rowIndex])
             guard panelsInRow > 0 else { continue }
             let totalHorizontalGap = gap * (panelsInRow - 1)
@@ -102,7 +102,7 @@ enum LayoutEngine {
 
             var currentX: CGFloat = 0
 
-            for _ in 0..<rowConfig[rowIndex] {
+            for _ in 0 ..< rowConfig[rowIndex] {
                 rects.append(CGRect(
                     x: currentX,
                     y: currentY,
@@ -129,7 +129,7 @@ enum LayoutEngine {
     ) -> CGFloat {
         var totalArea: CGFloat = 0
 
-        for i in 0..<min(rects.count, aspectRatios.count) {
+        for i in 0 ..< min(rects.count, aspectRatios.count) {
             let panel = rects[i]
             let videoAR = aspectRatios[i]
             let panelAR = panel.width / panel.height

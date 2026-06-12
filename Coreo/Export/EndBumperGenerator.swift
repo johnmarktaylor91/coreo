@@ -171,8 +171,8 @@ enum EndBumperGenerator {
             AVVideoHeightKey: Int(resolution.height),
             AVVideoCompressionPropertiesKey: [
                 AVVideoAverageBitRateKey: 5_000_000,
-                AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel,
-            ],
+                AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel
+            ]
         ]
         let input = AVAssetWriterInput(mediaType: .video, outputSettings: settings)
         input.expectsMediaDataInRealTime = false
@@ -184,7 +184,7 @@ enum EndBumperGenerator {
         [
             kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
             kCVPixelBufferWidthKey as String: Int(resolution.width),
-            kCVPixelBufferHeightKey as String: Int(resolution.height),
+            kCVPixelBufferHeightKey as String: Int(resolution.height)
         ]
     }
 
@@ -241,7 +241,7 @@ enum EndBumperGenerator {
         } else {
             let attrs: [String: Any] = [
                 kCVPixelBufferCGImageCompatibilityKey as String: true,
-                kCVPixelBufferCGBitmapContextCompatibilityKey as String: true,
+                kCVPixelBufferCGBitmapContextCompatibilityKey as String: true
             ]
             let status = CVPixelBufferCreate(
                 nil,
@@ -312,7 +312,7 @@ enum EndBumperGenerator {
         let font = UIFont.systemFont(ofSize: fontSize, weight: .medium)
         let attributes: [NSAttributedString.Key: Any] = [
             .font: font,
-            .foregroundColor: UIColor.white.withAlphaComponent(opacity),
+            .foregroundColor: UIColor.white.withAlphaComponent(opacity)
         ]
 
         let textSize = text.size(withAttributes: attributes)

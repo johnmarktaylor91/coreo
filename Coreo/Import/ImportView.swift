@@ -201,7 +201,7 @@ struct ImportView: View {
                         addTileButton
                     }
 
-                    ForEach(0..<viewModel.pendingImports, id: \.self) { _ in
+                    ForEach(0 ..< viewModel.pendingImports, id: \.self) { _ in
                         importPlaceholderTile
                     }
                 }
@@ -364,7 +364,7 @@ struct ImportView: View {
                     LinearGradient(
                         colors: [
                             accentCoral,
-                            Color(red: 0.91, green: 0.24, blue: 0.24),
+                            Color(red: 0.91, green: 0.24, blue: 0.24)
                         ],
                         startPoint: .leading,
                         endPoint: .trailing
@@ -509,15 +509,15 @@ struct ImportView: View {
                     }
                 }
 
-                var orderedURLs = Array<URL?>(repeating: nil, count: selectedItems.count)
+                var orderedURLs = [URL?](repeating: nil, count: selectedItems.count)
                 var failures: [(Int, Error)] = []
                 addNextIfPossible()
                 while activeCount > 0, let result = await group.next() {
                     activeCount -= 1
                     switch result.1 {
-                    case .success(let url):
+                    case let .success(url):
                         orderedURLs[result.0] = url
-                    case .failure(let error):
+                    case let .failure(error):
                         failures.append((result.0, error))
                     }
                     addNextIfPossible()

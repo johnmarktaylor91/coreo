@@ -21,7 +21,6 @@ import Foundation
 /// Returns `nil` when no persons were detected, signaling the caller
 /// to use the full frame (no crop).
 enum SmartCropEngine {
-
     /// Default padding fraction added around the activity region.
     /// 15% on each side provides comfortable framing without losing
     /// too much of the original field of view.
@@ -43,7 +42,7 @@ enum SmartCropEngine {
     ///   or `nil` if no persons were detected (meaning: use full frame).
     static func computeCropRect(
         detectedRects: [CGRect],
-        videoDimensions: CGSize,
+        videoDimensions _: CGSize,
         padding: CGFloat = 0.15
     ) -> CGRect? {
         guard !detectedRects.isEmpty else {
@@ -61,9 +60,7 @@ enum SmartCropEngine {
         let paddedRect = addPadding(to: flippedRect, padding: padding)
 
         // Step 4: Clamp to the valid [0, 1] range.
-        let clampedRect = clampToUnitRect(paddedRect)
-
-        return clampedRect
+        return clampToUnitRect(paddedRect)
     }
 
     // MARK: - Batch Processing
@@ -151,7 +148,7 @@ enum SmartCropEngine {
 
     /// Add padding around a rect, expanding it on all four sides.
     private static func addPadding(to rect: CGRect, padding: CGFloat) -> CGRect {
-        return CGRect(
+        CGRect(
             x: rect.origin.x - padding,
             y: rect.origin.y - padding,
             width: rect.size.width + 2 * padding,

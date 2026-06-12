@@ -66,13 +66,13 @@ enum SyncError: Error, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .insufficientVideos:
-            return "At least 2 videos are required for audio sync."
+            "At least 2 videos are required for audio sync."
         case .insufficientAudioBearingVideos:
-            return "At least 2 videos with audio are required for automatic sync."
-        case .audioExtractionFailed(let index, let underlying):
-            return "Failed to extract audio from video \(index): \(underlying.localizedDescription)"
+            "At least 2 videos with audio are required for automatic sync."
+        case let .audioExtractionFailed(index, underlying):
+            "Failed to extract audio from video \(index): \(underlying.localizedDescription)"
         case .correlationFailed:
-            return "Audio cross-correlation failed."
+            "Audio cross-correlation failed."
         }
     }
 }
@@ -87,7 +87,6 @@ enum SyncError: Error, LocalizedError {
 /// 4. Converts sample-domain lags to time-domain offsets.
 /// 5. Reports per-video statuses so the UI can warn about weak or missing audio.
 enum AudioSyncEngine {
-
     /// Correlation confidence below this threshold flags a video as potentially
     /// unmatched. The UI should warn the user and offer manual adjustment.
     static let confidenceThreshold: Float = 0.15
@@ -173,7 +172,7 @@ enum AudioSyncEngine {
         }
 
         let referenceIndex = chooseReference(videos: videos, candidateIndices: audioBearingIndices)
-        guard case .success(let fullReferenceAudio) = extracted[referenceIndex].audio else {
+        guard case let .success(fullReferenceAudio) = extracted[referenceIndex].audio else {
             throw SyncError.insufficientAudioBearingVideos
         }
         let referenceAudio = windowed(fullReferenceAudio)
@@ -287,7 +286,7 @@ enum AudioSyncEngine {
                 while activeCount < maxConcurrentCorrelations, !pending.isEmpty {
                     let item = pending.removeFirst()
                     switch item.audio {
-                    case .success(let fullAudio):
+                    case let .success(fullAudio):
                         activeCount += 1
                         group.addTask {
                             try Task.checkCancellation()
@@ -308,7 +307,7 @@ enum AudioSyncEngine {
                                 status: .synced
                             )
                         }
-                    case .failure(let error):
+                    case let .failure(error):
                         completedCount += 1
                         results.append(failedResult(index: item.index, error: error))
                     }
@@ -333,11 +332,10 @@ enum AudioSyncEngine {
 
     /// Build a failed result for a clip that cannot be used in audio sync.
     private static func failedResult(index: Int, error: Error) -> SyncResult {
-        let status: SyncStatus
-        if let extractionError = error as? AudioExtractionError, extractionError == .noAudioTrack {
-            status = .noAudio
+        let status: SyncStatus = if let extractionError = error as? AudioExtractionError, extractionError == .noAudioTrack {
+            .noAudio
         } else {
-            status = .failed(reason: error.localizedDescription)
+            .failed(reason: error.localizedDescription)
         }
 
         return SyncResult(

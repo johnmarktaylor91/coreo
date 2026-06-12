@@ -69,10 +69,10 @@ struct CoreoProject: Codable, Identifiable {
         self.createdAt = createdAt
         self.videos = videos
         self.referenceVideoID = referenceVideoID ?? videos.first?.id
-        self.speedSegments = []
-        self.annotations = []
-        self.timelineTrimStartSeconds = nil
-        self.timelineTrimDurationSeconds = nil
+        speedSegments = []
+        annotations = []
+        timelineTrimStartSeconds = nil
+        timelineTrimDurationSeconds = nil
         self.audioSourceVideoID = audioSourceVideoID ?? videos.first?.id
     }
 

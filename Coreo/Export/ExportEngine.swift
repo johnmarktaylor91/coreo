@@ -259,8 +259,7 @@ enum ExportEngine {
            let compAudioTrack = composition.addMutableTrack(
                withMediaType: .audio,
                preferredTrackID: kCMPersistentTrackID_Invalid
-           )
-        {
+           ) {
             let insertTime = CMTime(
                 seconds: max(0, project.videos[audioIndex].syncOffsetSeconds - project.timelineStartSeconds),
                 preferredTimescale: timescale
@@ -308,8 +307,7 @@ enum ExportEngine {
                 )
             case let .gap(clipIndex, range):
                 if let clipIndex,
-                   clipIndex < compositionVideoTracks.count
-                {
+                   clipIndex < compositionVideoTracks.count {
                     compositionVideoTracks[clipIndex].insertEmptyTimeRange(range)
                 } else {
                     for audioTrack in composition.tracks(withMediaType: .audio) {

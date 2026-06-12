@@ -5,11 +5,10 @@
 // (SmartCropEngine). These are pure-computation tests that don't require
 // AVFoundation or device hardware.
 
-import XCTest
 @testable import Coreo
+import XCTest
 
 final class AudioSyncTests: XCTestCase {
-
     // MARK: - FFTHelper: Identical Signals
 
     /// Two identical signals should produce lag 0 and high confidence.
@@ -34,7 +33,7 @@ final class AudioSyncTests: XCTestCase {
         // make the correlation peak sharper and more robust).
         var reference = generateSineWave(frequency: 440, sampleRate: sampleRate, duration: 2.0)
         let overlay = generateSineWave(frequency: 880, sampleRate: sampleRate, duration: 2.0)
-        for i in 0..<reference.count {
+        for i in 0 ..< reference.count {
             reference[i] += overlay[i] * 0.5
         }
 
@@ -62,7 +61,7 @@ final class AudioSyncTests: XCTestCase {
 
         var reference = generateSineWave(frequency: 440, sampleRate: sampleRate, duration: 2.0)
         let overlay = generateSineWave(frequency: 660, sampleRate: sampleRate, duration: 2.0)
-        for i in 0..<reference.count {
+        for i in 0 ..< reference.count {
             reference[i] += overlay[i] * 0.5
         }
 
@@ -84,9 +83,9 @@ final class AudioSyncTests: XCTestCase {
     /// audio content in both clips: `clipLocalTime = timelineTime - offset`.
     func test_syncEngineConventionLock_mapsTimelineToSameAudioContent() async throws {
         let sampleRate = 8000
-        let startDelaySamples = 2_000
-        let eventSample = 12_000
-        let shared = generateDeterministicSignal(sampleCount: 32_000)
+        let startDelaySamples = 2000
+        let eventSample = 12000
+        let shared = generateDeterministicSignal(sampleCount: 32000)
         let referenceURL = URL(fileURLWithPath: "/tmp/reference.mov")
         let delayedCameraURL = URL(fileURLWithPath: "/tmp/delayed-camera.mov")
         let signal = Array(shared.dropFirst(startDelaySamples))
@@ -94,7 +93,7 @@ final class AudioSyncTests: XCTestCase {
         let output = try await AudioSyncEngine.sync(
             videos: [
                 (referenceURL, 128_000),
-                (delayedCameraURL, 96_000),
+                (delayedCameraURL, 96000)
             ],
             audioProvider: { url, _ in
                 if url == referenceURL {
@@ -120,14 +119,14 @@ final class AudioSyncTests: XCTestCase {
         let referenceURL = URL(fileURLWithPath: "/tmp/reference.mov")
         let noAudioURL = URL(fileURLWithPath: "/tmp/no-audio.mov")
         let otherURL = URL(fileURLWithPath: "/tmp/other.mov")
-        let reference = generateDeterministicSignal(sampleCount: 16_000)
+        let reference = generateDeterministicSignal(sampleCount: 16000)
         let other = Array(reference.dropFirst(400))
 
         let output = try await AudioSyncEngine.sync(
             videos: [
                 (referenceURL, 128_000),
                 (noAudioURL, 999_000),
-                (otherURL, 96_000),
+                (otherURL, 96000)
             ],
             audioProvider: { url, _ in
                 if url == noAudioURL {
@@ -154,21 +153,21 @@ final class AudioSyncTests: XCTestCase {
     func test_syncEngine_windowedCorrelation_recoversKnownOffset() async throws {
         let referenceURL = URL(fileURLWithPath: "/tmp/reference-window.mov")
         let otherURL = URL(fileURLWithPath: "/tmp/other-window.mov")
-        let shiftSamples = 1_200
+        let shiftSamples = 1200
         let reference = generateDeterministicSignal(sampleCount: 608_000)
         let other = Array(reference.dropFirst(shiftSamples))
 
         let output = try await AudioSyncEngine.sync(
             videos: [
                 (referenceURL, 128_000),
-                (otherURL, 96_000),
+                (otherURL, 96000)
             ],
             audioProvider: { url, _ in
                 url == referenceURL ? reference : other
             }
         )
 
-        let recoveredSamples = Int((output.offsets[1] * 8_000).rounded())
+        let recoveredSamples = Int((output.offsets[1] * 8000).rounded())
         XCTAssertEqual(recoveredSamples, shiftSamples, accuracy: 2)
     }
 
@@ -177,18 +176,18 @@ final class AudioSyncTests: XCTestCase {
     func test_syncEngine_cancellationStopsWork() async {
         let urls = [
             URL(fileURLWithPath: "/tmp/a.mov"),
-            URL(fileURLWithPath: "/tmp/b.mov"),
+            URL(fileURLWithPath: "/tmp/b.mov")
         ]
 
         let task = Task {
             try await AudioSyncEngine.sync(
                 videos: urls.map { ($0, 128_000) },
                 audioProvider: { _, _ in
-                    for _ in 0..<1_000 {
+                    for _ in 0 ..< 1000 {
                         try Task.checkCancellation()
                         try await Task.sleep(nanoseconds: 1_000_000)
                     }
-                    return self.generateDeterministicSignal(sampleCount: 8_000)
+                    return self.generateDeterministicSignal(sampleCount: 8000)
                 }
             )
         }
@@ -224,8 +223,8 @@ final class AudioSyncTests: XCTestCase {
 
         // Add some noise to make them less harmonically related.
         var noisyRef = reference
-        for i in 0..<noisyRef.count {
-            noisyRef[i] += Float.random(in: -0.5...0.5)
+        for i in 0 ..< noisyRef.count {
+            noisyRef[i] += Float.random(in: -0.5 ... 0.5)
         }
 
         let (_, confidence) = FFTHelper.findOffset(signal: signal, reference: noisyRef)
@@ -392,7 +391,7 @@ final class AudioSyncTests: XCTestCase {
         let sampleCount = Int(sampleRate * duration)
         var samples = [Float](repeating: 0, count: sampleCount)
 
-        for i in 0..<sampleCount {
+        for i in 0 ..< sampleCount {
             let t = Float(i) / sampleRate
             samples[i] = sinf(2.0 * .pi * frequency * t)
         }
@@ -406,7 +405,7 @@ final class AudioSyncTests: XCTestCase {
         var samples = [Float]()
         samples.reserveCapacity(sampleCount)
 
-        for index in 0..<sampleCount {
+        for index in 0 ..< sampleCount {
             state = state &* 6_364_136_223_846_793_005 &+ 1
             let noise = Float((state >> 40) & 0xFFFF) / Float(UInt16.max) - 0.5
             let tone = sinf(Float(index) * 0.017) * 0.25

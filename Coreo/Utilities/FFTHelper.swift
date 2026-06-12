@@ -47,7 +47,7 @@ enum FFTHelper {
         signal: [Float],
         reference: [Float]
     ) -> (correlation: [Float], peakIndex: Int, peakValue: Float) {
-        return crossCorrelate(signal: signal, reference: reference, plan: nil)
+        crossCorrelate(signal: signal, reference: reference, plan: nil)
     }
 
     /// Computes the cross-correlation using an optional reusable FFT setup.
@@ -93,8 +93,8 @@ enum FFTHelper {
         // Zero-pad both signals to fftLength
         var paddedSignal = [Float](repeating: 0, count: fftLength)
         var paddedReference = [Float](repeating: 0, count: fftLength)
-        paddedSignal.replaceSubrange(0..<signal.count, with: signal)
-        paddedReference.replaceSubrange(0..<reference.count, with: reference)
+        paddedSignal.replaceSubrange(0 ..< signal.count, with: signal)
+        paddedReference.replaceSubrange(0 ..< reference.count, with: reference)
 
         // Convert to split complex format for FFT
         var signalReal = [Float](repeating: 0, count: halfLength)
@@ -255,7 +255,7 @@ enum FFTHelper {
         signal: [Float],
         reference: [Float]
     ) -> (lagSamples: Int, confidence: Float) {
-        return findOffset(signal: signal, reference: reference, plan: nil)
+        findOffset(signal: signal, reference: reference, plan: nil)
     }
 
     /// Finds the optimal lag in samples between two signals.
@@ -302,11 +302,10 @@ enum FFTHelper {
         vDSP_dotpr(reference, 1, reference, 1, &referenceEnergy, vDSP_Length(reference.count))
 
         let denominator = sqrtf(signalEnergy * referenceEnergy)
-        let confidence: Float
-        if denominator > 0 {
-            confidence = min(abs(result.peakValue) / denominator, 1.0)
+        let confidence: Float = if denominator > 0 {
+            min(abs(result.peakValue) / denominator, 1.0)
         } else {
-            confidence = 0
+            0
         }
 
         return (lagSamples: lag, confidence: confidence)

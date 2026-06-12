@@ -3,11 +3,10 @@
 //
 // Unit tests for the split-screen layout calculator.
 
-import XCTest
 @testable import Coreo
+import XCTest
 
 final class LayoutEngineTests: XCTestCase {
-
     let container = CGSize(width: 1000, height: 600)
     let gap: CGFloat = 4
 
@@ -125,7 +124,7 @@ final class LayoutEngineTests: XCTestCase {
     // MARK: - No Overlaps
 
     func testNoRectsOverlapForAnyCount() {
-        for count in 2...6 {
+        for count in 2 ... 6 {
             let aspectRatios = Array(repeating: CGFloat(16.0 / 9.0), count: count)
             let rects = LayoutEngine.calculateLayout(
                 videoCount: count,
@@ -137,8 +136,8 @@ final class LayoutEngineTests: XCTestCase {
             XCTAssertEqual(rects.count, count, "Wrong number of rects for \(count) videos")
 
             // Check that no pair of rects overlap (allowing for gap)
-            for i in 0..<rects.count {
-                for j in (i + 1)..<rects.count {
+            for i in 0 ..< rects.count {
+                for j in (i + 1) ..< rects.count {
                     // Inset each rect by a tiny amount to allow for floating-point rounding
                     let a = rects[i].insetBy(dx: 0.5, dy: 0.5)
                     let b = rects[j].insetBy(dx: 0.5, dy: 0.5)
@@ -217,11 +216,11 @@ final class LayoutEngineTests: XCTestCase {
         let containers = [
             CGSize(width: 1000, height: 600),
             CGSize(width: 390, height: 844),
-            CGSize(width: 1920, height: 1080),
+            CGSize(width: 1920, height: 1080)
         ]
 
         for container in containers {
-            for count in 1...6 {
+            for count in 1 ... 6 {
                 let rects = LayoutEngine.calculateLayout(
                     videoCount: count,
                     aspectRatios: Array(repeating: 16.0 / 9.0, count: count),

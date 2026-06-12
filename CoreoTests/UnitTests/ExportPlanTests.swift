@@ -98,7 +98,7 @@ final class ExportPlanTests: XCTestCase {
         let sources = [
             makeSource(index: 0, fps: 24, hasAudio: true),
             makeSource(index: 1, fps: 59.94, hasAudio: true),
-            makeSource(index: 2, fps: 120, hasAudio: true),
+            makeSource(index: 2, fps: 120, hasAudio: true)
         ]
 
         XCTAssertEqual(ExportPlan.chooseOutputFPS(sources: sources), 60)

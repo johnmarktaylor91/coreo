@@ -17,7 +17,7 @@ struct DocumentPickerView: UIViewControllerRepresentable {
     private static let supportedTypes: [UTType] = [
         .movie,
         .mpeg4Movie,
-        .quickTimeMovie,
+        .quickTimeMovie
     ]
 
     func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
@@ -31,8 +31,8 @@ struct DocumentPickerView: UIViewControllerRepresentable {
     }
 
     func updateUIViewController(
-        _ uiViewController: UIDocumentPickerViewController,
-        context: Context
+        _: UIDocumentPickerViewController,
+        context _: Context
     ) {
         // No dynamic updates needed.
     }
@@ -52,14 +52,14 @@ struct DocumentPickerView: UIViewControllerRepresentable {
         }
 
         func documentPicker(
-            _ controller: UIDocumentPickerViewController,
+            _: UIDocumentPickerViewController,
             didPickDocumentsAt urls: [URL]
         ) {
             onPick(urls)
         }
 
         func documentPickerWasCancelled(
-            _ controller: UIDocumentPickerViewController
+            _: UIDocumentPickerViewController
         ) {
             // User cancelled -- nothing to do.
         }

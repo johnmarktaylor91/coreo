@@ -300,7 +300,7 @@ extension TimedAnnotation {
         ("Yellow", "#FFD60A"),
         ("Cyan", "#64D2FF"),
         ("Green", "#30D158"),
-        ("Orange", "#FF9F0A"),
+        ("Orange", "#FF9F0A")
     ]
 }
 

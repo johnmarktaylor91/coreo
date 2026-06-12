@@ -199,11 +199,11 @@ struct TimelineView: View {
     /// - Returns: Orange for slow-mo, red for holds, green for fast.
     private func speedSegmentColor(for segment: SpeedSegment) -> Color {
         if segment.isHold {
-            return .red
+            .red
         } else if segment.rate < 1.0 {
-            return .orange
+            .orange
         } else {
-            return .green
+            .green
         }
     }
 
@@ -332,7 +332,7 @@ struct TimelineView: View {
             .onEnded { _ in
                 isDragging = false
                 viewModel.seek(to: playback.currentTimeSeconds, precise: true)
-                if wasPlayingBeforeDrag && !playback.isPlaying {
+                if wasPlayingBeforeDrag, !playback.isPlaying {
                     viewModel.togglePlayback()
                 }
                 wasPlayingBeforeDrag = false

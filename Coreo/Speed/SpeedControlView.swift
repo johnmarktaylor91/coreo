@@ -55,7 +55,7 @@ struct SpeedControlView: View {
         ("0.75x", 0.75),
         ("1x", 1.0),
         ("1.5x", 1.5),
-        ("2x", 2.0),
+        ("2x", 2.0)
     ]
 
     /// Available hold duration presets.
@@ -63,7 +63,7 @@ struct SpeedControlView: View {
         ("Hold 1s", 1.0),
         ("Hold 2s", 2.0),
         ("Hold 3s", 3.0),
-        ("Hold 5s", 5.0),
+        ("Hold 5s", 5.0)
     ]
 
     // MARK: - Body

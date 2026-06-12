@@ -208,7 +208,7 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(loaded.project.name, "Original")
     }
 
-    func testRemoveMissingMediaKeepsAvailableVideos() throws {
+    func testRemoveMissingMediaKeepsAvailableVideos() {
         let store = ProjectStore(projectsRoot: tempRoot)
         let available = makeVideo(filename: "available.mp4", duration: 10)
         var missing = makeVideo(filename: "missing.mp4", duration: 10)

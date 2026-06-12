@@ -3,11 +3,10 @@
 //
 // Unit tests for time formatting utilities.
 
-import XCTest
 @testable import Coreo
+import XCTest
 
 final class TimeFormattingTests: XCTestCase {
-
     // MARK: - format (M:SS.ff)
 
     func testFormatTypicalValue() {

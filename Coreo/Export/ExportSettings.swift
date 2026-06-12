@@ -16,18 +16,18 @@ enum ExportAspectRatio: String, CaseIterable, Identifiable {
     /// Output resolution for each aspect ratio.
     var resolution: CGSize {
         switch self {
-        case .landscape: return CGSize(width: 1920, height: 1080)
-        case .portrait:  return CGSize(width: 1080, height: 1920)
-        case .square:    return CGSize(width: 1080, height: 1080)
+        case .landscape: CGSize(width: 1920, height: 1080)
+        case .portrait: CGSize(width: 1080, height: 1920)
+        case .square: CGSize(width: 1080, height: 1080)
         }
     }
 
     /// SF Symbol for the picker.
     var iconName: String {
         switch self {
-        case .landscape: return "rectangle"
-        case .portrait:  return "rectangle.portrait"
-        case .square:    return "square"
+        case .landscape: "rectangle"
+        case .portrait: "rectangle.portrait"
+        case .square: "square"
         }
     }
 }

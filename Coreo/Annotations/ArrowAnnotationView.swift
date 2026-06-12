@@ -86,7 +86,6 @@ struct ArrowAnnotationView: View {
     /// A small circle grab handle rendered at the given point.
     ///
     /// - Parameter point: The absolute position for the handle.
-    @ViewBuilder
     private func selectionHandle(at point: CGPoint) -> some View {
         Circle()
             .fill(Color.white)
@@ -116,7 +115,7 @@ struct ArrowShape: Shape {
     /// The length of the arrowhead, used to shorten the shaft.
     var headLength: CGFloat = 12
 
-    func path(in rect: CGRect) -> Path {
+    func path(in _: CGRect) -> Path {
         var path = Path()
 
         let dx = end.x - start.x
@@ -163,7 +162,7 @@ struct ArrowheadShape: Shape {
     /// The half-angle spread of the arrowhead wings in radians (~30 degrees).
     private let wingAngle: CGFloat = .pi / 6
 
-    func path(in rect: CGRect) -> Path {
+    func path(in _: CGRect) -> Path {
         var path = Path()
 
         // Left wing point

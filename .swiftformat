@@ -1,0 +1,15 @@
+--swiftversion 5.9
+--indent 4
+--linebreaks lf
+--semicolons never
+--commas inline
+--trimwhitespace always
+--insertlines enabled
+--self remove
+--disable wrapPropertyBodies
+--disable wrapMultilineStatementBraces
+--disable redundantFileprivate
+--exclude .git
+--exclude .project-context
+--exclude Coreo.xcodeproj
+--exclude DerivedData

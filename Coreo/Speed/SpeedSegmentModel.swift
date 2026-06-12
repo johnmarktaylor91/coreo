@@ -87,16 +87,14 @@ struct SpeedMap {
         for existing in segments {
             // No overlap — keep existing unchanged
             if existing.endTimeSeconds <= segment.startTimeSeconds
-                || existing.startTimeSeconds >= segment.endTimeSeconds
-            {
+                || existing.startTimeSeconds >= segment.endTimeSeconds {
                 updated.append(existing)
                 continue
             }
 
             // Existing is fully contained by new segment — remove it
             if existing.startTimeSeconds >= segment.startTimeSeconds,
-               existing.endTimeSeconds <= segment.endTimeSeconds
-            {
+               existing.endTimeSeconds <= segment.endTimeSeconds {
                 continue
             }
 
