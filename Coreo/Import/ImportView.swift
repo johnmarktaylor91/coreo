@@ -19,6 +19,7 @@ struct ImportView: View {
     @State private var showPhotoPicker = false
     @State private var showFilePicker = false
     @State private var selectedPhotos: [PhotosPickerItem] = []
+    @State private var syncTask: Task<Void, Never>?
 
     /// App background color.
     private let backgroundColor = Color(red: 0.04, green: 0.04, blue: 0.04)
@@ -56,21 +57,21 @@ struct ImportView: View {
         }
         .sheet(isPresented: $showFilePicker) {
             DocumentPickerView { urls in
-                Task { @MainActor in
-                    viewModel.pendingImports += urls.count
-                    for url in urls {
-                        await viewModel.addVideo(from: url)
-                        viewModel.pendingImports -= 1
-                    }
-                }
-            }
-        }
-        .onChange(of: viewModel.pendingImports) { count in
-            if count == 0 && viewModel.canSync {
                 Task {
-                    if let project = await viewModel.sync() {
-                        onSyncComplete(project)
+                    let acceptedCount = ImportViewModel.acceptedImportCount(
+                        existingCount: viewModel.videos.count,
+                        requestedCount: urls.count
+                    )
+                    if acceptedCount != urls.count {
+                        viewModel.syncError = acceptedCount == 0
+                            ? "Coreo supports up to 6 videos. Remove a video to add another."
+                            : "Only \(acceptedCount) more video(s) can be added. Coreo supports up to 6."
+                        Haptic.error()
+                        if acceptedCount == 0 {
+                            return
+                        }
                     }
+                    await viewModel.addVideos(from: Array(urls.prefix(acceptedCount)))
                 }
             }
         }
@@ -128,6 +129,8 @@ struct ImportView: View {
             if let errorMessage = viewModel.syncError {
                 errorBanner(errorMessage)
             }
+
+            importErrorList
         }
         .padding(.horizontal, 32)
     }
@@ -147,7 +150,13 @@ struct ImportView: View {
                     }
 
                     // Inline add button
-                    addTileButton
+                    if viewModel.videos.count < ImportViewModel.maxVideoCount {
+                        addTileButton
+                    }
+
+                    ForEach(0..<viewModel.pendingImports, id: \.self) { _ in
+                        importPlaceholderTile
+                    }
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
@@ -155,6 +164,16 @@ struct ImportView: View {
             .frame(height: 140)
 
             Spacer()
+
+            if viewModel.pendingImports > 0 {
+                Text("Importing \(viewModel.pendingImports) video(s)...")
+                    .font(.subheadline)
+                    .foregroundColor(.gray)
+                    .padding(.bottom, 12)
+            }
+
+            importErrorList
+                .padding(.bottom, 12)
 
             // Error display
             if let errorMessage = viewModel.syncError {
@@ -167,11 +186,17 @@ struct ImportView: View {
                 syncProgressView
                     .padding(.horizontal, 24)
                     .padding(.bottom, 32)
-            } else if viewModel.syncError != nil && viewModel.canSync {
+            } else if viewModel.canSync {
                 syncButton
                     .padding(.horizontal, 24)
                     .padding(.bottom, 32)
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
+            } else if let reason = viewModel.syncDisabledReason {
+                Text(reason)
+                    .font(.subheadline)
+                    .foregroundColor(.gray)
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 32)
             }
         }
     }
@@ -186,12 +211,14 @@ struct ImportView: View {
             } label: {
                 Label("Photo Library", systemImage: "photo.on.rectangle")
             }
+            .disabled(viewModel.videos.count >= ImportViewModel.maxVideoCount || viewModel.isSyncing)
 
             Button {
                 showFilePicker = true
             } label: {
                 Label("Files", systemImage: "folder")
             }
+            .disabled(viewModel.videos.count >= ImportViewModel.maxVideoCount || viewModel.isSyncing)
         } label: {
             Image(systemName: "plus")
                 .foregroundColor(accentCoral)
@@ -215,6 +242,7 @@ struct ImportView: View {
             .cornerRadius(CornerRadius.large)
         }
         .buttonStyle(.coreoProminent)
+        .disabled(viewModel.isSyncing)
     }
 
     /// Secondary button for importing from Files (empty state).
@@ -238,6 +266,7 @@ struct ImportView: View {
             )
         }
         .buttonStyle(.coreoProminent)
+        .disabled(viewModel.isSyncing)
     }
 
     /// Small tile at the end of the thumbnail row for adding more videos.
@@ -248,12 +277,14 @@ struct ImportView: View {
             } label: {
                 Label("Photo Library", systemImage: "photo.on.rectangle")
             }
+            .disabled(viewModel.videos.count >= ImportViewModel.maxVideoCount || viewModel.isSyncing)
 
             Button {
                 showFilePicker = true
             } label: {
                 Label("Files", systemImage: "folder")
             }
+            .disabled(viewModel.videos.count >= ImportViewModel.maxVideoCount || viewModel.isSyncing)
         } label: {
             VStack {
                 Image(systemName: "plus")
@@ -270,10 +301,11 @@ struct ImportView: View {
     private var syncButton: some View {
         Button {
             Haptic.medium()
-            Task {
+            syncTask = Task {
                 if let project = await viewModel.sync() {
                     onSyncComplete(project)
                 }
+                syncTask = nil
             }
         } label: {
             Text("Sync & Go")
@@ -301,15 +333,35 @@ struct ImportView: View {
     /// Progress indicator shown during sync.
     private var syncProgressView: some View {
         VStack(spacing: 12) {
-            ProgressView()
-                .progressViewStyle(.circular)
+            ProgressView(value: viewModel.syncProgress)
                 .tint(accentCoral)
-            Text("Syncing audio\u{2026}")
-                .font(.subheadline)
-                .foregroundColor(.gray)
+            HStack {
+                Text(viewModel.syncPhaseLabel.isEmpty ? "Preparing..." : viewModel.syncPhaseLabel)
+                    .font(.subheadline)
+                    .foregroundColor(.gray)
+                Spacer()
+                Button("Cancel") {
+                    syncTask?.cancel()
+                    syncTask = nil
+                    viewModel.cancelSync()
+                }
+                .font(.subheadline.weight(.semibold))
+                .foregroundColor(accentCoral)
+            }
         }
         .frame(maxWidth: .infinity)
         .frame(height: 56)
+    }
+
+    /// Placeholder shown for imports still being processed.
+    private var importPlaceholderTile: some View {
+        RoundedRectangle(cornerRadius: 8)
+            .fill(Color.white.opacity(0.06))
+            .overlay {
+                ProgressView()
+                    .tint(accentCoral)
+            }
+            .frame(width: 80, height: 100)
     }
 
     // MARK: - Error Banner
@@ -323,14 +375,42 @@ struct ImportView: View {
             .padding(.horizontal, 24)
     }
 
+    /// Displays per-file import errors with retry where possible.
+    private var importErrorList: some View {
+        VStack(spacing: 8) {
+            ForEach(viewModel.importErrors) { item in
+                HStack(spacing: 8) {
+                    Text(item.message)
+                        .font(.caption)
+                        .foregroundColor(Color(red: 1.0, green: 0.3, blue: 0.3))
+                        .lineLimit(2)
+                    Spacer()
+                    if item.retryURL != nil {
+                        Button("Retry") {
+                            Task {
+                                await viewModel.retryImport(item)
+                            }
+                        }
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(accentCoral)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color.white.opacity(0.06))
+                .cornerRadius(8)
+            }
+        }
+    }
+
     // MARK: - Unreliable Alert
 
     /// Builds a human-readable message listing all unreliable videos.
     private var unreliableAlertMessage: String {
         let names = viewModel.unreliableVideos
-            .map { $0.filename }
+            .map { "\($0.filename) (\($0.reason))" }
             .joined(separator: ", ")
-        return "Couldn't confidently match: \(names). Audio may not overlap. Include anyway?"
+        return "Couldn't automatically sync: \(names). Videos without audio can be aligned manually later. Include anyway?"
     }
 
     // MARK: - Photo Picker Handling
@@ -339,14 +419,77 @@ struct ImportView: View {
     private func handlePhotoPickerSelection(_ items: [PhotosPickerItem]) {
         guard !items.isEmpty else { return }
 
-        for item in items {
-            viewModel.pendingImports += 1
-            Task {
-                defer { viewModel.pendingImports -= 1 }
-                guard let movie = try? await item.loadTransferable(type: VideoTransferable.self) else {
-                    return
+        Task {
+            let acceptedCount = ImportViewModel.acceptedImportCount(
+                existingCount: viewModel.videos.count,
+                requestedCount: items.count
+            )
+            guard acceptedCount > 0 else {
+                viewModel.syncError = "Coreo supports up to 6 videos. Remove a video to add another."
+                Haptic.error()
+                return
+            }
+            if acceptedCount < items.count {
+                viewModel.syncError = "Only \(acceptedCount) more video(s) can be added. Coreo supports up to 6."
+                Haptic.error()
+            }
+
+            let selectedItems = Array(items.prefix(acceptedCount))
+            viewModel.pendingImports += selectedItems.count
+            defer { viewModel.pendingImports = max(0, viewModel.pendingImports - selectedItems.count) }
+
+            await withTaskGroup(of: (Int, Result<URL, Error>).self) { group in
+                var nextIndex = 0
+                var activeCount = 0
+
+                func addNextIfPossible() {
+                    while activeCount < 3, nextIndex < selectedItems.count {
+                        let index = nextIndex
+                        let item = selectedItems[index]
+                        nextIndex += 1
+                        activeCount += 1
+
+                        group.addTask {
+                            do {
+                                guard let movie = try await item.loadTransferable(type: VideoTransferable.self) else {
+                                    throw CocoaError(.fileReadUnknown)
+                                }
+                                return (index, .success(movie.url))
+                            } catch {
+                                return (index, .failure(error))
+                            }
+                        }
+                    }
                 }
-                await viewModel.addVideo(from: movie.url)
+
+                var orderedURLs = Array<URL?>(repeating: nil, count: selectedItems.count)
+                var failures: [(Int, Error)] = []
+                addNextIfPossible()
+                while activeCount > 0, let result = await group.next() {
+                    activeCount -= 1
+                    switch result.1 {
+                    case .success(let url):
+                        orderedURLs[result.0] = url
+                    case .failure(let error):
+                        failures.append((result.0, error))
+                    }
+                    addNextIfPossible()
+                }
+
+                for failure in failures {
+                    let filename = "Photo \(failure.0 + 1)"
+                    viewModel.importErrors.append(
+                        ImportViewModel.ImportErrorItem(
+                            filename: filename,
+                            message: "Failed to import \(filename): \(failure.1.localizedDescription)",
+                            retryURL: nil
+                        )
+                    )
+                    viewModel.syncError = "Some videos couldn't be imported."
+                    Haptic.error()
+                }
+
+                await viewModel.addVideos(from: orderedURLs.compactMap { $0 })
             }
         }
 

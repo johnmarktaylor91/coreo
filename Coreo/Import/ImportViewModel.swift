@@ -31,11 +31,26 @@ final class ImportViewModel: ObservableObject {
     /// Number of video imports currently in progress.
     @Published var pendingImports: Int = 0
 
+    /// Current sync progress fraction from 0...1.
+    @Published var syncProgress: Double = 0
+
+    /// User-facing phase label for the sync pipeline.
+    @Published var syncPhaseLabel: String = ""
+
+    /// Per-item import failures shown in the import UI.
+    @Published var importErrors: [ImportErrorItem] = []
+
     // MARK: - Internal State
 
     /// Cached sync output held between the initial sync call and user
     /// confirmation of unreliable videos.
     private var pendingSyncOutput: AudioSyncOutput?
+
+    /// Maximum supported videos for one Coreo project.
+    nonisolated static let maxVideoCount: Int = 6
+
+    /// Maximum file imports to process at once.
+    private nonisolated static let maxConcurrentImports: Int = 3
 
     // MARK: - Types
 
@@ -45,13 +60,33 @@ final class ImportViewModel: ObservableObject {
         let index: Int
         let filename: String
         let confidence: Float
+        let reason: String
+    }
+
+    /// A visible import failure with optional retry URL.
+    struct ImportErrorItem: Identifiable {
+        let id = UUID()
+        let filename: String
+        let message: String
+        let retryURL: URL?
     }
 
     // MARK: - Computed Properties
 
     /// True when the minimum requirements for sync are met.
     var canSync: Bool {
-        videos.count >= 2 && !isSyncing
+        videos.count >= 2 && videos.count <= Self.maxVideoCount && !isSyncing
+    }
+
+    /// Explanation for why sync is currently unavailable.
+    var syncDisabledReason: String? {
+        if videos.count < 2 {
+            return "Add at least 2 videos to sync."
+        }
+        if videos.count > Self.maxVideoCount {
+            return "Coreo supports up to 6 videos."
+        }
+        return nil
     }
 
     // MARK: - Video Management
@@ -63,20 +98,77 @@ final class ImportViewModel: ObservableObject {
     ///
     /// - Parameter url: A file URL pointing to a video.
     func addVideo(from url: URL) async {
+        guard Self.acceptedImportCount(existingCount: videos.count, requestedCount: 1) == 1 else {
+            syncError = "Coreo supports up to 6 videos. Remove a video to add another."
+            Haptic.error()
+            return
+        }
+
         syncError = nil
         let filename = url.lastPathComponent
         do {
             let asset = try await VideoAsset.from(url: url)
             videos.append(asset)
         } catch {
-            syncError = "Failed to import \(filename): \(error.localizedDescription)"
+            recordImportError(filename: filename, message: error.localizedDescription, retryURL: url)
         }
+    }
+
+    /// Imports multiple videos concurrently while preserving selected order.
+    ///
+    /// - Parameter urls: File URLs selected by the user.
+    func addVideos(from urls: [URL]) async {
+        guard !urls.isEmpty else { return }
+
+        let acceptedCount = Self.acceptedImportCount(
+            existingCount: videos.count,
+            requestedCount: urls.count
+        )
+        guard acceptedCount > 0 else {
+            syncError = "Coreo supports up to 6 videos. Remove a video to add another."
+            Haptic.error()
+            return
+        }
+        if acceptedCount < urls.count {
+            syncError = "Only \(acceptedCount) more video(s) can be added. Coreo supports up to 6."
+            Haptic.error()
+        } else {
+            syncError = nil
+        }
+
+        let selectedURLs = Array(urls.prefix(acceptedCount))
+        pendingImports += selectedURLs.count
+        defer { pendingImports = max(0, pendingImports - selectedURLs.count) }
+
+        let results = await importAssets(from: selectedURLs)
+        for result in results {
+            switch result {
+            case .success(let asset):
+                videos.append(asset)
+            case .failure(let failure):
+                recordImportError(
+                    filename: failure.url.lastPathComponent,
+                    message: failure.error.localizedDescription,
+                    retryURL: failure.url
+                )
+            }
+        }
+    }
+
+    /// Retry one failed import item.
+    ///
+    /// - Parameter item: Failed import item to retry.
+    func retryImport(_ item: ImportErrorItem) async {
+        guard let retryURL = item.retryURL else { return }
+        importErrors.removeAll { $0.id == item.id }
+        await addVideo(from: retryURL)
     }
 
     /// Removes the video at the given index.
     ///
     /// - Parameter index: A valid index into `videos`.
     func removeVideo(at index: Int) {
+        guard !isSyncing else { return }
         guard videos.indices.contains(index) else { return }
         videos.remove(at: index)
         syncError = nil
@@ -100,29 +192,58 @@ final class ImportViewModel: ObservableObject {
         syncError = nil
         unreliableVideos = []
         pendingSyncOutput = nil
+        syncProgress = 0
+        syncPhaseLabel = "Analyzing audio..."
 
         do {
-            let inputs = videos.map { (url: $0.localURL, audioBitrate: $0.audioBitrate) }
-            let output = try await AudioSyncEngine.sync(videos: inputs)
+            let videoSnapshot = videos
+            let inputs = videoSnapshot.map { (url: $0.localURL, audioBitrate: $0.audioBitrate) }
+            let output = try await AudioSyncEngine.sync(videos: inputs) { phase, fraction in
+                Task { @MainActor in
+                    switch phase {
+                    case .extraction:
+                        self.syncPhaseLabel = "Extracting audio..."
+                        self.syncProgress = min(max(fraction * 0.55, 0), 0.55)
+                    case .correlation:
+                        self.syncPhaseLabel = "Matching audio..."
+                        self.syncProgress = min(max(0.55 + fraction * 0.20, 0.55), 0.75)
+                    }
+                }
+            }
+            try Task.checkCancellation()
 
             // Check for unreliable results
             let unreliable = output.results.compactMap { result -> UnreliableVideo? in
                 guard !result.isReliable else { return nil }
                 let idx = result.videoIndex
-                let name = idx < videos.count
-                    ? videos[idx].localURL.lastPathComponent
+                let name = idx < videoSnapshot.count
+                    ? videoSnapshot[idx].localURL.lastPathComponent
                     : "Video \(idx)"
+                let reason: String
+                switch result.status {
+                case .synced:
+                    reason = "Low confidence"
+                case .noAudio:
+                    reason = "No audio; align manually later"
+                case .failed(let failureReason):
+                    reason = failureReason
+                }
                 return UnreliableVideo(
                     index: idx,
                     filename: name,
-                    confidence: result.confidence
+                    confidence: result.confidence,
+                    reason: reason
                 )
             }
 
             if unreliable.isEmpty {
                 // All videos are reliable — build the project now
-                let project = await buildProject(from: output)
+                syncPhaseLabel = "Finding dancers..."
+                syncProgress = 0.75
+                let project = await buildProject(from: output, videos: videoSnapshot)
+                syncProgress = 1
                 isSyncing = false
+                Haptic.success()
                 return project
             } else {
                 // Park the output and ask the user
@@ -130,11 +251,21 @@ final class ImportViewModel: ObservableObject {
                 unreliableVideos = unreliable
                 showUnreliableAlert = true
                 isSyncing = false
+                Haptic.error()
                 return nil
             }
+        } catch is CancellationError {
+            syncError = "Sync cancelled."
+            isSyncing = false
+            syncProgress = 0
+            syncPhaseLabel = ""
+            return nil
         } catch {
             syncError = "Sync failed: \(error.localizedDescription)"
             isSyncing = false
+            syncProgress = 0
+            syncPhaseLabel = ""
+            Haptic.error()
             return nil
         }
     }
@@ -149,8 +280,12 @@ final class ImportViewModel: ObservableObject {
         guard let output = pendingSyncOutput else { return nil }
 
         if includeUnreliable {
-            let project = await buildProject(from: output)
+            syncPhaseLabel = "Finding dancers..."
+            syncProgress = 0.75
+            let project = await buildProject(from: output, videos: videos)
+            syncProgress = 1
             pendingSyncOutput = nil
+            Haptic.success()
             return project
         } else {
             // Remove unreliable videos and rebuild
@@ -181,26 +316,104 @@ final class ImportViewModel: ObservableObject {
                 syncOffsets: filteredOffsets
             )
             project.audioSourceIndex = selectBestAudioSource(from: filteredVideos)
+            syncPhaseLabel = "Finding dancers..."
+            syncProgress = 0.75
             project.cropOverrides = await computeCropOverrides(for: filteredVideos)
+            syncProgress = 1
             pendingSyncOutput = nil
+            Haptic.success()
             return project
         }
+    }
+
+    /// Reset sync UI state after a user cancellation request.
+    func cancelSync() {
+        syncError = "Sync cancelled."
+        isSyncing = false
+        syncProgress = 0
+        syncPhaseLabel = ""
+    }
+
+    /// Return how many requested videos can be accepted under the max cap.
+    ///
+    /// - Parameters:
+    ///   - existingCount: Number of videos already imported.
+    ///   - requestedCount: Number of new videos requested.
+    /// - Returns: Number of videos that may be imported.
+    nonisolated static func acceptedImportCount(existingCount: Int, requestedCount: Int) -> Int {
+        let remaining = max(0, maxVideoCount - existingCount)
+        return min(max(0, requestedCount), remaining)
     }
 
     // MARK: - Private Helpers
 
     /// Constructs a CoreoProject from sync output, applying offsets,
     /// selecting the best audio source, and computing smart crop rects.
-    private func buildProject(from output: AudioSyncOutput) async -> CoreoProject {
+    private func buildProject(from output: AudioSyncOutput, videos videoList: [VideoAsset]) async -> CoreoProject {
         var project = CoreoProject(
             name: "New Project",
-            videos: videos,
+            videos: videoList,
             referenceVideoIndex: output.referenceIndex,
             syncOffsets: output.offsets
         )
         project.audioSourceIndex = output.audioSourceIndex
-        project.cropOverrides = await computeCropOverrides(for: videos)
+        project.cropOverrides = await computeCropOverrides(for: videoList)
         return project
+    }
+
+    /// Imports selected URLs with bounded concurrency.
+    private func importAssets(from urls: [URL]) async -> [Result<VideoAsset, ImportFailure>] {
+        await withTaskGroup(of: (Int, Result<VideoAsset, ImportFailure>).self) { group in
+            var nextIndex = 0
+            var activeCount = 0
+            var results = Array<Result<VideoAsset, ImportFailure>?>(repeating: nil, count: urls.count)
+
+            func addNextIfPossible() {
+                while activeCount < Self.maxConcurrentImports, nextIndex < urls.count {
+                    let index = nextIndex
+                    let url = urls[index]
+                    nextIndex += 1
+                    activeCount += 1
+
+                    group.addTask {
+                        do {
+                            let asset = try await VideoAsset.from(url: url)
+                            return (index, .success(asset))
+                        } catch {
+                            return (index, .failure(ImportFailure(url: url, error: error)))
+                        }
+                    }
+                }
+            }
+
+            addNextIfPossible()
+            while activeCount > 0, let result = await group.next() {
+                activeCount -= 1
+                results[result.0] = result.1
+                addNextIfPossible()
+            }
+
+            return results.compactMap { $0 }
+        }
+    }
+
+    /// Record a per-item import error.
+    private func recordImportError(filename: String, message: String, retryURL: URL?) {
+        importErrors.append(
+            ImportErrorItem(
+                filename: filename,
+                message: "Failed to import \(filename): \(message)",
+                retryURL: retryURL
+            )
+        )
+        syncError = "Some videos couldn't be imported."
+        Haptic.error()
+    }
+
+    /// Failed file import result.
+    private struct ImportFailure: Error {
+        let url: URL
+        let error: Error
     }
 
     /// Runs person detection on each video and produces a crop-overrides

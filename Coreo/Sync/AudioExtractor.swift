@@ -53,6 +53,11 @@ enum AudioExtractor {
         guard let audioTrack = audioTracks.first else {
             throw AudioExtractionError.noAudioTrack
         }
+        let duration = try await asset.load(.duration)
+        let durationSeconds = CMTimeGetSeconds(duration)
+        let estimatedSampleCount = durationSeconds.isFinite && durationSeconds > 0
+            ? Int((durationSeconds * targetSampleRate).rounded(.up))
+            : 8_192
 
         // Configure output format: mono Float32 at the target sample rate.
         let outputSettings: [String: Any] = [
@@ -88,14 +93,34 @@ enum AudioExtractor {
 
             // Read all sample buffers and concatenate into one Float array.
             var allSamples: [Float] = []
+            allSamples.reserveCapacity(max(estimatedSampleCount, 8_192))
 
             while reader.status == .reading {
-                guard let sampleBuffer = output.copyNextSampleBuffer() else {
+                try Task.checkCancellation()
+
+                var extractedSamples: [Float] = []
+                var extractionError: Error?
+                let shouldContinue = autoreleasepool {
+                    guard let sampleBuffer = output.copyNextSampleBuffer() else {
+                        return false
+                    }
+
+                    do {
+                        extractedSamples = try extractFloats(from: sampleBuffer)
+                    } catch {
+                        extractionError = error
+                    }
+                    return true
+                }
+
+                if let extractionError {
+                    throw extractionError
+                }
+                guard shouldContinue else {
                     break
                 }
 
-                let floats = try extractFloats(from: sampleBuffer)
-                allSamples.append(contentsOf: floats)
+                allSamples.append(contentsOf: extractedSamples)
             }
 
             if reader.status == .failed {
@@ -135,23 +160,49 @@ enum AudioExtractor {
             return []
         }
 
-        var data = Data(count: length)
-        let status = data.withUnsafeMutableBytes { rawBuffer in
-            guard let baseAddress = rawBuffer.baseAddress else {
-                return OSStatus(kCMBlockBufferNoErr + 1)
+        var dataPointer: UnsafeMutablePointer<Int8>?
+        var lengthAtOffset = 0
+        var totalLength = 0
+        let pointerStatus = CMBlockBufferGetDataPointer(
+            blockBuffer,
+            atOffset: 0,
+            lengthAtOffsetOut: &lengthAtOffset,
+            totalLengthOut: &totalLength,
+            dataPointerOut: &dataPointer
+        )
+
+        if pointerStatus == kCMBlockBufferNoErr,
+           let dataPointer,
+           totalLength >= length,
+           lengthAtOffset >= length {
+            return [Float](unsafeUninitializedCapacity: sampleCount) { buffer, initializedCount in
+                let source = UnsafeRawBufferPointer(start: dataPointer, count: length)
+                let floats = source.bindMemory(to: Float.self)
+                guard let destination = buffer.baseAddress else {
+                    initializedCount = 0
+                    return
+                }
+                destination.initialize(from: floats.baseAddress!, count: sampleCount)
+                initializedCount = sampleCount
             }
-            return CMBlockBufferCopyDataBytes(blockBuffer, atOffset: 0, dataLength: length, destination: baseAddress)
         }
 
-        guard status == kCMBlockBufferNoErr else {
-            throw AudioExtractionError.readFailed
+        return try [Float](unsafeUninitializedCapacity: sampleCount) { buffer, initializedCount in
+            guard let baseAddress = buffer.baseAddress else {
+                initializedCount = 0
+                throw AudioExtractionError.readFailed
+            }
+            let status = CMBlockBufferCopyDataBytes(
+                blockBuffer,
+                atOffset: 0,
+                dataLength: length,
+                destination: baseAddress
+            )
+            guard status == kCMBlockBufferNoErr else {
+                initializedCount = 0
+                throw AudioExtractionError.readFailed
+            }
+            initializedCount = sampleCount
         }
-
-        let floats: [Float] = data.withUnsafeBytes { rawBuffer in
-            let floatBuffer = rawBuffer.bindMemory(to: Float.self)
-            return Array(floatBuffer)
-        }
-
-        return floats
     }
 }

@@ -24,8 +24,8 @@ final class AudioSyncTests: XCTestCase {
 
     // MARK: - FFTHelper: Known Shift
 
-    /// When the signal is a shifted copy of the reference, findOffset should
-    /// recover the shift within a small tolerance.
+    /// When signal content is delayed relative to reference content, findOffset
+    /// should return a negative lag.
     func test_findOffset_knownShift_recoversLag() {
         let sampleRate: Float = 8000
         let shiftSamples = 200 // 25 ms shift at 8 kHz
@@ -44,9 +44,9 @@ final class AudioSyncTests: XCTestCase {
 
         let (lag, confidence) = FFTHelper.findOffset(signal: signal, reference: reference)
 
-        // The lag should be close to shiftSamples. Allow +-2 samples tolerance
-        // because FFT bin resolution introduces slight quantization.
-        XCTAssertEqual(lag, shiftSamples, accuracy: 2,
+        // The implementation's convention is canonical: delayed signal content
+        // produces a negative lag.
+        XCTAssertEqual(lag, -shiftSamples, accuracy: 2,
                        "Should recover the known shift of \(shiftSamples) samples")
         XCTAssertGreaterThan(confidence, 0.1,
                              "Shifted copy should still produce meaningful confidence")
@@ -54,8 +54,8 @@ final class AudioSyncTests: XCTestCase {
 
     // MARK: - FFTHelper: Negative Shift
 
-    /// When the signal leads the reference (negative lag), findOffset should
-    /// return a negative value.
+    /// When signal content leads reference content, findOffset should return a
+    /// positive lag.
     func test_findOffset_negativeShift_returnsNegativeLag() {
         let sampleRate: Float = 8000
         let shiftSamples = 150
@@ -72,10 +72,147 @@ final class AudioSyncTests: XCTestCase {
 
         let (lag, _) = FFTHelper.findOffset(signal: reference, reference: paddedReference)
 
-        // Signal leads the padded reference, so lag should be negative.
-        XCTAssertLessThan(lag, 0, "Signal that leads reference should produce negative lag")
+        // Signal leads the padded reference, so lag should be positive.
+        XCTAssertGreaterThan(lag, 0, "Signal that leads reference should produce positive lag")
         XCTAssertEqual(abs(lag), shiftSamples, accuracy: 2,
                        "Magnitude should match the shift")
+    }
+
+    // MARK: - AudioSyncEngine: Convention Lock
+
+    /// The engine's offset convention maps a unified timeline time to the same
+    /// audio content in both clips: `clipLocalTime = timelineTime - offset`.
+    func test_syncEngineConventionLock_mapsTimelineToSameAudioContent() async throws {
+        let sampleRate = 8000
+        let startDelaySamples = 2_000
+        let eventSample = 12_000
+        let shared = generateDeterministicSignal(sampleCount: 32_000)
+        let referenceURL = URL(fileURLWithPath: "/tmp/reference.mov")
+        let delayedCameraURL = URL(fileURLWithPath: "/tmp/delayed-camera.mov")
+        let signal = Array(shared.dropFirst(startDelaySamples))
+
+        let output = try await AudioSyncEngine.sync(
+            videos: [
+                (referenceURL, 128_000),
+                (delayedCameraURL, 96_000),
+            ],
+            audioProvider: { url, _ in
+                if url == referenceURL {
+                    return shared
+                }
+                return signal
+            }
+        )
+
+        let offsetSamples = Int((output.offsets[1] * Double(sampleRate)).rounded())
+        XCTAssertEqual(offsetSamples, startDelaySamples, accuracy: 2)
+
+        // At timeline sample 12_000, the second clip's local sample is
+        // 12_000 - 2_000. Both indexes address the same shared audio content.
+        let secondClipSample = eventSample - offsetSamples
+        XCTAssertEqual(signal[secondClipSample], shared[eventSample], accuracy: 0.0001)
+    }
+
+    // MARK: - AudioSyncEngine: Partial Results
+
+    /// A no-audio clip should not abort sync for the other audio-bearing clips.
+    func test_syncEngine_skipsNoAudioClip_returnsPartialResults() async throws {
+        let referenceURL = URL(fileURLWithPath: "/tmp/reference.mov")
+        let noAudioURL = URL(fileURLWithPath: "/tmp/no-audio.mov")
+        let otherURL = URL(fileURLWithPath: "/tmp/other.mov")
+        let reference = generateDeterministicSignal(sampleCount: 16_000)
+        let other = Array(reference.dropFirst(400))
+
+        let output = try await AudioSyncEngine.sync(
+            videos: [
+                (referenceURL, 128_000),
+                (noAudioURL, 999_000),
+                (otherURL, 96_000),
+            ],
+            audioProvider: { url, _ in
+                if url == noAudioURL {
+                    throw AudioExtractionError.noAudioTrack
+                }
+                if url == otherURL {
+                    return other
+                }
+                return reference
+            }
+        )
+
+        XCTAssertNotEqual(output.referenceIndex, 1, "Reference selection must ignore no-audio clips")
+        XCTAssertEqual(output.offsets[1], 0)
+        let noAudioResult = try XCTUnwrap(output.results.first { $0.videoIndex == 1 })
+        XCTAssertEqual(noAudioResult.status, .noAudio)
+        let syncedResult = try XCTUnwrap(output.results.first { $0.videoIndex == 2 })
+        XCTAssertEqual(syncedResult.status, .synced)
+        XCTAssertTrue(syncedResult.isReliable)
+    }
+
+    /// The engine's bounded correlation window still recovers offsets that are
+    /// present in the analyzed audio window.
+    func test_syncEngine_windowedCorrelation_recoversKnownOffset() async throws {
+        let referenceURL = URL(fileURLWithPath: "/tmp/reference-window.mov")
+        let otherURL = URL(fileURLWithPath: "/tmp/other-window.mov")
+        let shiftSamples = 1_200
+        let reference = generateDeterministicSignal(sampleCount: 608_000)
+        let other = Array(reference.dropFirst(shiftSamples))
+
+        let output = try await AudioSyncEngine.sync(
+            videos: [
+                (referenceURL, 128_000),
+                (otherURL, 96_000),
+            ],
+            audioProvider: { url, _ in
+                url == referenceURL ? reference : other
+            }
+        )
+
+        let recoveredSamples = Int((output.offsets[1] * 8_000).rounded())
+        XCTAssertEqual(recoveredSamples, shiftSamples, accuracy: 2)
+    }
+
+    /// Cancelling a sync task should stop the engine instead of producing a
+    /// partial failure result.
+    func test_syncEngine_cancellationStopsWork() async {
+        let urls = [
+            URL(fileURLWithPath: "/tmp/a.mov"),
+            URL(fileURLWithPath: "/tmp/b.mov"),
+        ]
+
+        let task = Task {
+            try await AudioSyncEngine.sync(
+                videos: urls.map { ($0, 128_000) },
+                audioProvider: { _, _ in
+                    for _ in 0..<1_000 {
+                        try Task.checkCancellation()
+                        try await Task.sleep(nanoseconds: 1_000_000)
+                    }
+                    return self.generateDeterministicSignal(sampleCount: 8_000)
+                }
+            )
+        }
+
+        task.cancel()
+
+        do {
+            _ = try await task.value
+            XCTFail("Cancelled sync should throw")
+        } catch is CancellationError {
+            // Expected.
+        } catch {
+            XCTFail("Expected CancellationError, got \(error)")
+        }
+    }
+
+    // MARK: - Import Cap
+
+    /// The import cap helper enforces the 2-6 video contract from the import side.
+    func test_importAcceptedCount_enforcesSixVideoCap() {
+        XCTAssertEqual(ImportViewModel.acceptedImportCount(existingCount: 0, requestedCount: 6), 6)
+        XCTAssertEqual(ImportViewModel.acceptedImportCount(existingCount: 5, requestedCount: 3), 1)
+        XCTAssertEqual(ImportViewModel.acceptedImportCount(existingCount: 6, requestedCount: 1), 0)
+        XCTAssertEqual(ImportViewModel.acceptedImportCount(existingCount: 2, requestedCount: -1), 0)
     }
 
     // MARK: - FFTHelper: Uncorrelated Signals
@@ -258,6 +395,22 @@ final class AudioSyncTests: XCTestCase {
         for i in 0..<sampleCount {
             let t = Float(i) / sampleRate
             samples[i] = sinf(2.0 * .pi * frequency * t)
+        }
+
+        return samples
+    }
+
+    /// Generate deterministic broadband samples for unambiguous correlation.
+    private func generateDeterministicSignal(sampleCount: Int) -> [Float] {
+        var state: UInt64 = 0x1234_5678_9ABC_DEF0
+        var samples = [Float]()
+        samples.reserveCapacity(sampleCount)
+
+        for index in 0..<sampleCount {
+            state = state &* 6_364_136_223_846_793_005 &+ 1
+            let noise = Float((state >> 40) & 0xFFFF) / Float(UInt16.max) - 0.5
+            let tone = sinf(Float(index) * 0.017) * 0.25
+            samples.append(noise + tone)
         }
 
         return samples

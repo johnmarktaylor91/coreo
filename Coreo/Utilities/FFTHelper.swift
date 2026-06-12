@@ -8,6 +8,31 @@ import Accelerate
 
 /// FFT-based cross-correlation utilities for audio synchronization.
 enum FFTHelper {
+    /// Reusable FFT setup for correlations whose padded length is no larger
+    /// than the configured maximum.
+    final class FFTPlan {
+        /// Maximum supported base-2 exponent.
+        let maxLog2n: Int
+
+        /// Underlying vDSP setup.
+        fileprivate let setup: FFTSetup
+
+        /// Create a reusable FFT setup.
+        ///
+        /// - Parameter maxLength: Maximum padded FFT length the plan will handle.
+        init?(maxLength: Int) {
+            maxLog2n = FFTHelper.nextLog2(maxLength)
+            guard let setup = vDSP_create_fftsetup(vDSP_Length(maxLog2n), FFTRadix(kFFTRadix2)) else {
+                return nil
+            }
+            self.setup = setup
+        }
+
+        deinit {
+            vDSP_destroy_fftsetup(setup)
+        }
+    }
+
     /// Computes the cross-correlation between two signals using FFT.
     ///
     /// The correlation peak indicates the lag (in samples) at which the
@@ -22,6 +47,21 @@ enum FFTHelper {
         signal: [Float],
         reference: [Float]
     ) -> (correlation: [Float], peakIndex: Int, peakValue: Float) {
+        return crossCorrelate(signal: signal, reference: reference, plan: nil)
+    }
+
+    /// Computes the cross-correlation using an optional reusable FFT setup.
+    ///
+    /// - Parameters:
+    ///   - signal: The signal to align.
+    ///   - reference: The reference signal to align against.
+    ///   - plan: Optional reusable FFT plan.
+    /// - Returns: A tuple of the full correlation array, peak index, and peak value.
+    static func crossCorrelate(
+        signal: [Float],
+        reference: [Float],
+        plan: FFTPlan?
+    ) -> (correlation: [Float], peakIndex: Int, peakValue: Float) {
         guard !signal.isEmpty, !reference.isEmpty else {
             return (correlation: [], peakIndex: 0, peakValue: 0)
         }
@@ -32,11 +72,23 @@ enum FFTHelper {
         let fftLength = 1 << log2n
         let halfLength = fftLength / 2
 
-        // Set up the FFT
-        guard let fftSetup = vDSP_create_fftsetup(vDSP_Length(log2n), FFTRadix(kFFTRadix2)) else {
+        // Set up the FFT.
+        let createdSetup: FFTSetup?
+        let fftSetup: FFTSetup
+        if let plan, plan.maxLog2n >= log2n {
+            createdSetup = nil
+            fftSetup = plan.setup
+        } else if let setup = vDSP_create_fftsetup(vDSP_Length(log2n), FFTRadix(kFFTRadix2)) {
+            createdSetup = setup
+            fftSetup = setup
+        } else {
             return (correlation: [], peakIndex: 0, peakValue: 0)
         }
-        defer { vDSP_destroy_fftsetup(fftSetup) }
+        defer {
+            if let createdSetup {
+                vDSP_destroy_fftsetup(createdSetup)
+            }
+        }
 
         // Zero-pad both signals to fftLength
         var paddedSignal = [Float](repeating: 0, count: fftLength)
@@ -101,16 +153,49 @@ enum FFTHelper {
             }
         }
 
-        // Multiply: FFT(reference) * conj(FFT(signal))
-        // conj(signal) = sigR - j*sigI
-        // (refR + j*refI)(sigR - j*sigI) = (refR*sigR + refI*sigI) + j*(refI*sigR - refR*sigI)
+        // Multiply: FFT(reference) * conj(FFT(signal)).
         var productReal = [Float](repeating: 0, count: halfLength)
         var productImag = [Float](repeating: 0, count: halfLength)
 
-        for i in 0..<halfLength {
-            productReal[i] = refReal[i] * signalReal[i] + refImag[i] * signalImag[i]
-            productImag[i] = refImag[i] * signalReal[i] - refReal[i] * signalImag[i]
+        refReal.withUnsafeMutableBufferPointer { refRBuf in
+            refImag.withUnsafeMutableBufferPointer { refIBuf in
+                signalReal.withUnsafeMutableBufferPointer { signalRBuf in
+                    signalImag.withUnsafeMutableBufferPointer { signalIBuf in
+                        productReal.withUnsafeMutableBufferPointer { productRBuf in
+                            productImag.withUnsafeMutableBufferPointer { productIBuf in
+                                var signalSplit = DSPSplitComplex(
+                                    realp: signalRBuf.baseAddress!,
+                                    imagp: signalIBuf.baseAddress!
+                                )
+                                var referenceSplit = DSPSplitComplex(
+                                    realp: refRBuf.baseAddress!,
+                                    imagp: refIBuf.baseAddress!
+                                )
+                                var productSplit = DSPSplitComplex(
+                                    realp: productRBuf.baseAddress!,
+                                    imagp: productIBuf.baseAddress!
+                                )
+                                vDSP_zvmul(
+                                    &signalSplit,
+                                    1,
+                                    &referenceSplit,
+                                    1,
+                                    &productSplit,
+                                    1,
+                                    vDSP_Length(halfLength),
+                                    -1
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
+
+        // In zrip packing, index 0 stores DC in realp and Nyquist in imagp.
+        // They are both real-valued bins, so handle them outside complex math.
+        productReal[0] = refReal[0] * signalReal[0]
+        productImag[0] = refImag[0] * signalImag[0]
 
         // Inverse FFT to get correlation
         productReal.withUnsafeMutableBufferPointer { rBuf in
@@ -139,8 +224,8 @@ enum FFTHelper {
             }
         }
 
-        // Scale by 1/(2*N) -- vDSP's inverse FFT leaves a factor of 2*N
-        var scale = 1.0 / Float(fftLength * 2)
+        // Scale by 1/N after the inverse transform.
+        var scale = 1.0 / Float(fftLength)
         vDSP_vsmul(correlation, 1, &scale, &correlation, 1, vDSP_Length(fftLength))
 
         // Find peak
@@ -157,8 +242,10 @@ enum FFTHelper {
 
     /// Finds the optimal lag in samples between two signals.
     ///
-    /// A positive lag means `signal` is delayed relative to `reference`.
-    /// A negative lag means `signal` leads `reference`.
+    /// A negative lag means `signal` content is delayed relative to
+    /// `reference` content. A positive lag means `signal` content leads
+    /// `reference` content, which maps to a camera that started recording
+    /// later than the reference.
     ///
     /// - Parameters:
     ///   - signal: The signal to align.
@@ -168,11 +255,31 @@ enum FFTHelper {
         signal: [Float],
         reference: [Float]
     ) -> (lagSamples: Int, confidence: Float) {
+        return findOffset(signal: signal, reference: reference, plan: nil)
+    }
+
+    /// Finds the optimal lag in samples between two signals.
+    ///
+    /// A negative lag means `signal` content is delayed relative to
+    /// `reference` content. A positive lag means `signal` content leads
+    /// `reference` content, which maps to a camera that started recording
+    /// later than the reference.
+    ///
+    /// - Parameters:
+    ///   - signal: The signal to align.
+    ///   - reference: The reference signal.
+    ///   - plan: Optional reusable FFT plan.
+    /// - Returns: A tuple of lag in samples and normalized confidence (0-1).
+    static func findOffset(
+        signal: [Float],
+        reference: [Float],
+        plan: FFTPlan?
+    ) -> (lagSamples: Int, confidence: Float) {
         guard !signal.isEmpty, !reference.isEmpty else {
             return (lagSamples: 0, confidence: 0)
         }
 
-        let result = crossCorrelate(signal: signal, reference: reference)
+        let result = crossCorrelate(signal: signal, reference: reference, plan: plan)
 
         guard !result.correlation.isEmpty else {
             return (lagSamples: 0, confidence: 0)
@@ -181,9 +288,8 @@ enum FFTHelper {
         let n = result.correlation.count
 
         // Interpret the peak index as a signed lag.
-        // Indices 0..N/2-1 represent positive lags (signal delayed).
-        // Indices N/2..N-1 represent negative lags (signal leads),
-        // mapped as index - N.
+        // Positive lags mean signal content leads reference content.
+        // Negative lags mean signal content is delayed relative to reference.
         var lag = result.peakIndex
         if lag > n / 2 {
             lag = lag - n
@@ -204,6 +310,25 @@ enum FFTHelper {
         }
 
         return (lagSamples: lag, confidence: confidence)
+    }
+
+    /// Finds the optimal lag while cooperatively observing task cancellation.
+    ///
+    /// - Parameters:
+    ///   - signal: The signal to align.
+    ///   - reference: The reference signal.
+    ///   - plan: Optional reusable FFT plan.
+    /// - Returns: A tuple of lag in samples and normalized confidence (0-1).
+    /// - Throws: `CancellationError` when the current task is cancelled.
+    static func findOffsetCancellable(
+        signal: [Float],
+        reference: [Float],
+        plan: FFTPlan?
+    ) throws -> (lagSamples: Int, confidence: Float) {
+        try Task.checkCancellation()
+        let result = findOffset(signal: signal, reference: reference, plan: plan)
+        try Task.checkCancellation()
+        return result
     }
 
     // MARK: - Private Helpers
