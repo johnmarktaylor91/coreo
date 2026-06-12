@@ -1,94 +1,91 @@
-# Coreo Performance & Reliability
+# Coreo Performance Architecture
 
-## Optimization Sprint Summary (2026-03-17)
+Purpose: document the performance mechanisms that are present in current source, with references. This file does not include benchmark numbers unless they are encoded in source or test commands.
 
-### Issues Found: 49 total
-| Severity | Found | Fixed | Deferred |
-|----------|-------|-------|----------|
-| Critical | 3     | 3     | 0        |
-| High     | 12    | 10    | 2        |
-| Medium   | 18    | 6     | 12       |
-| Low      | 16    | 0     | 16       |
+Grounded in code as of 2026-06-12 (post follow-up run). If code changes materially, regenerate rather than patch.
 
-### Critical Fixes (all done)
-1. **Retain cycle / time observer leak** — WorkspaceViewModel had no tearDown path called reliably. Time observers, Combine sinks, and notification observers were never cleaned up. Fixed: `.onDisappear` calls `tearDown()`, which removes all observers, pauses players, cancels export, and clears subscriptions.
-2. **tearDown() never called on any code path** — The back button paused but never tore down. Fixed: `.onDisappear` modifier on WorkspaceView.
-3. **Time observer closure retain cycle** — `self` -> `players` -> observer -> weak self, but token held by self. Fixed by ensuring tearDown breaks the cycle reliably.
+## Sync And Audio
 
-### High Fixes (10 of 12)
-1. **No `preferredForwardBufferDuration`** — 6 AVPlayers buffering 30-60s of HD video each = 1-2 GB RAM. Fixed: set to 5 seconds per player item.
-2. **No background/foreground handling** — Players decoded frames into nothing when backgrounded. Fixed: observe `didEnterBackground` / `willEnterForeground`, pause/resume accordingly.
-3. **No `beginBackgroundTask` in export** — Export silently failed when backgrounded. Fixed: request background execution time before export starts.
-4. **No `autoreleasepool` in AudioExtractor** — CMSampleBuffer temporaries accumulated across the entire read loop for a 5-minute clip. Fixed: wrap each iteration.
-5. **Double copy in AudioExtractor** — Sample data was copied twice (CMBlockBuffer -> Data -> [Float]). Fixed: single copy directly into [Float] array.
-6. **No `reserveCapacity` on audio samples array** — Repeated reallocations for 2.4M samples. Fixed: pre-compute from track duration.
-7. **Scalar loop in FFT complex multiply** — 72k iterations of manual multiply replaced with single `vDSP_zvmul` call.
-8. **CGImage not released in PersonDetector** — Each ~6MB frame lingered while next was generated. Fixed: autoreleasepool per iteration.
-9. **Division by zero in speed segments** — `segment.rate == 0` would produce Infinity. Fixed: guard `rate > 0`.
-10. **Export cancellation race** — Catching both `CancellationError` and `ExportError.cancelled` without showing error alert.
+| Mechanism | What it does | Source |
+|---|---|---|
+| 8 kHz mono extraction | Audio sync and waveform generation share 8000 Hz mono PCM extraction, reducing sample volume before FFT or envelope work. | `Coreo/Sync/AudioExtractor.swift:47`, `Coreo/Sync/AudioSyncEngine.swift:94`, `Coreo/Sync/WaveformEnvelope.swift:34` |
+| Off-main extraction | AVAssetReader setup and sample reading run in a detached user-initiated task. | `Coreo/Sync/AudioExtractor.swift:72` |
+| Reader memory hygiene | `alwaysCopiesSampleData = false`, reserved sample capacity, per-buffer autoreleasepool, direct float extraction, and cancellation checks are used during reads. | `Coreo/Sync/AudioExtractor.swift:81`, `Coreo/Sync/AudioExtractor.swift:94`, `Coreo/Sync/AudioExtractor.swift:97`, `Coreo/Sync/AudioExtractor.swift:171` |
+| Windowed correlation | Correlation uses at most the first 75 seconds of extracted audio. | `Coreo/Sync/AudioSyncEngine.swift:98`, `Coreo/Sync/AudioSyncEngine.swift:347` |
+| Bounded correlation concurrency | Expensive pair correlations are capped at 2 active tasks. | `Coreo/Sync/AudioSyncEngine.swift:101`, `Coreo/Sync/AudioSyncEngine.swift:279` |
+| Task-local FFT plan | Each correlation creates an FFT plan sized for that pair and reuses it inside `FFTHelper` when large enough. | `Coreo/Sync/AudioSyncEngine.swift:289`, `Coreo/Utilities/FFTHelper.swift:13`, `Coreo/Utilities/FFTHelper.swift:78` |
+| Accelerate multiply and confidence | Frequency-domain multiply uses `vDSP_zvmul`; confidence is normalized by signal and reference energy. | `Coreo/Utilities/FFTHelper.swift:156`, `Coreo/Utilities/FFTHelper.swift:298` |
+| Cooperative cancellation | Sync checks cancellation between extraction and correlation work, and cancellable offset finding checks before and after the FFT path. | `Coreo/Sync/AudioSyncEngine.swift:162`, `Coreo/Sync/AudioSyncEngine.swift:287`, `Coreo/Utilities/FFTHelper.swift:322` |
 
-### High Deferred (2)
-- **New CAShapeLayer on every updateUIView** (VideoPanelView) — Needs UIView subclass refactor to cache mask layer. Impact: allocation churn at 20-120 objects/sec. Not a crash risk.
-- **Thumbnail Data re-decoded on every SwiftUI redraw** (VideoThumbnailView) — Needs @State image caching pattern. Impact: JPEG decompressions during scroll. Not a crash risk.
+## Playback
 
-### Medium Fixes (6)
-1. **Export task not cancelled on tearDown** — Added `exportTask?.cancel()`.
-2. **Exported temp file leaked** — Added `cleanUpExportedFile()` called on share sheet dismiss.
-3. **Lifecycle observer cleanup** — Background/foreground observers removed in tearDown.
-4. **syncOffsets bounds check** — Time observer now guards `validReferenceIndex < syncOffsets.count`.
-5. **audioSourceIndex clamped** — Clamped to `players.count - 1` in setupPlayers.
-6. **Cancellation support in sync/crop** — Added `Task.checkCancellation()` to AudioSyncEngine and PersonDetector loops.
+| Mechanism | What it does | Source |
+|---|---|---|
+| Split observable model | `WorkspaceViewModel` owns project/editor state, while `PlaybackController`, `AnnotationStore`, `ExportCoordinator`, and `CountInController` isolate high-churn state. | `Coreo/Workspace/WorkspaceViewModel.swift:12`, `Coreo/Workspace/PlaybackController.swift:10`, `Coreo/Workspace/AnnotationStore.swift:9`, `Coreo/Workspace/ExportCoordinator.swift:10` |
+| 30 Hz playhead scope | The 33.3 ms clock updates `PlaybackController.currentTimeSeconds`; the leaf `ActiveVideoPanelView` reads it, while layout and project state remain outside that ticking field. | `Coreo/Workspace/PlaybackController.swift:421`, `Coreo/Workspace/VideoGridView.swift:102`, `Coreo/Workspace/VideoGridView.swift:143` |
+| Host-time rate changes | Active players use `setRate(_:time:atHostTime:)` so rate changes and activation windows are applied atomically against a host clock. | `Coreo/Workspace/PlaybackController.swift:548`, `Coreo/Workspace/PlaybackController.swift:568` |
+| Seek coalescing | Every seek increments a generation, cancels the previous seek task, and only the latest generation can resume or apply the plan. | `Coreo/Workspace/PlaybackController.swift:616` |
+| Scrub tolerance split | Precise settles use zero tolerance; interactive scrub seeks use 0.1 second tolerance. | `Coreo/Workspace/PlaybackController.swift:635`, `Coreo/Workspace/TimelineView.swift:349`, `Coreo/Workspace/TimelineView.swift:355` |
+| Drift correction cadence | Drift checks are gated to about once per second and only adjust active players outside one 30 fps frame. | `Coreo/Workspace/PlaybackController.swift:585` |
+| AVPlayer buffering | Player items set `preferredForwardBufferDuration = 5` and disable automatic waiting to minimize stalling. | `Coreo/Workspace/PlaybackController.swift:340` |
+| LayoutCache | Workspace panel rectangles are memoized by container size, video IDs, dimensions, and panel overrides; project mutation invalidates the cache. | `Coreo/Workspace/LayoutCache.swift:9`, `Coreo/Workspace/LayoutCache.swift:24`, `Coreo/Workspace/WorkspaceViewModel.swift:17` |
 
-### Medium Deferred (12)
-- FFT intermediate arrays not scoped for early release
-- Full correlation array allocated but unused in FFTHelper
-- Unbounded concurrent correlations in AudioSyncEngine (cap at 2)
-- Crop detection errors silently swallowed
-- Crop results not cached across workspace re-entries
-- Export cancellation doesn't cancel AVAssetExportSession itself
-- CMTimeRange insertTime negative (theoretical, invariant-protected)
-- referenceVideoIndex can go stale if videos removed
-- videos.count == syncOffsets.count invariant not enforced at model level
-- Pixel format mismatch between bumper (ARGB) and compositor (BGRA)
-- PencilKit annotation re-renders every frame
-- Audio session active at launch, never deactivated
+## Annotations And Waveforms
 
----
+| Mechanism | What it does | Source |
+|---|---|---|
+| Rasterize-once annotation cache | Annotation bitmaps are cached by annotation ID, content signature, and destination size; preview invalidates when content signatures change. | `Coreo/Annotations/AnnotationRasterizer.swift:62`, `Coreo/Annotations/AnnotationRasterizer.swift:88`, `Coreo/Annotations/AnnotationOverlayView.swift:54` |
+| Shared preview/export rasterizer | Preview and export both render through `AnnotationRasterizer`, avoiding two separate rendering implementations. | `Coreo/Annotations/AnnotationOverlayView.swift:264`, `Coreo/Annotations/AnnotationRasterizer.swift:308` |
+| Export annotation cache | `AnnotationExportFrameRenderer` has its own `AnnotationRasterCache` and applies cached overlays per frame. | `Coreo/Annotations/AnnotationRasterizer.swift:313`, `Coreo/Annotations/AnnotationRasterizer.swift:356` |
+| Waveform envelope cache | Workspace caches envelopes by video ID and tracks loading IDs to avoid duplicate extraction tasks. | `Coreo/Workspace/WorkspaceViewModel.swift:55`, `Coreo/Workspace/WorkspaceViewModel.swift:512` |
+| Bounded waveform buckets | Waveform envelopes use 0.035 second RMS buckets and reduce to at most 4000 buckets per clip. | `Coreo/Sync/WaveformEnvelope.swift:37`, `Coreo/Sync/WaveformEnvelope.swift:111` |
+| Off-main waveform extraction | Waveform building calls the same async PCM extraction route, which does AVAssetReader work in a detached task. | `Coreo/Sync/WaveformEnvelope.swift:47`, `Coreo/Sync/AudioExtractor.swift:72` |
 
-## Known Performance Characteristics
+## Crop And Vision
 
-### Memory
-- **Workspace with 6 videos**: ~200-400 MB expected (6 AVPlayers with 5s forward buffer each)
-- **Audio sync**: ~40 MB peak (reference + 2 concurrent correlations + FFT intermediaries)
-- **Person detection**: ~20 MB peak (1 CGImage at 1280px + Vision inference buffers)
-- **Export**: ~100 MB peak (CIContext + source pixel buffers + output buffer)
+| Mechanism | What it does | Source |
+|---|---|---|
+| Crop concurrent with sync | Import starts crop detection as `async let` while audio sync runs. | `Coreo/Import/ImportViewModel.swift:223` |
+| Per-video crop concurrency | `SmartCropEngine.computeCropRects` runs one task per video and reassembles results in original order. | `Coreo/Crop/SmartCropEngine.swift:68`, `Coreo/Crop/SmartCropEngine.swift:80`, `Coreo/Crop/SmartCropEngine.swift:110` |
+| Vision batch image API | Person detection uses `AVAssetImageGenerator.images(for:)` over sampled times instead of one synchronous copy per frame. | `Coreo/Crop/PersonDetector.swift:73`, `Coreo/Crop/PersonDetector.swift:82` |
+| Detection memory bounds | Generated frames are capped to 1280x1280, detection runs off-main, and per-frame Vision work is wrapped in autoreleasepool. | `Coreo/Crop/PersonDetector.swift:67`, `Coreo/Crop/PersonDetector.swift:77`, `Coreo/Crop/PersonDetector.swift:87` |
+| Full-body request | Vision human rectangles are configured with `upperBodyOnly = false` for full-body dance framing. | `Coreo/Crop/PersonDetector.swift:137` |
+| Crop fallback | Detection errors return nil crop for that video, which means full-frame rendering. | `Coreo/Crop/SmartCropEngine.swift:96`, `Coreo/Crop/SmartCropEngine.swift:21` |
 
-### Timing
-- **Audio sync**: <2s for typical 3-5 min clips (8kHz downsample, vDSP FFT)
-- **Smart crop**: 3-7s per video (sequential frame processing, ~72 frames at 2.5s intervals)
-- **Export**: Varies by duration and resolution. 1920x1080, 3min, 2 videos: ~30-60s
+## Export
 
-### Known Limitations
-- Smart crop processes frames sequentially per video (concurrent across videos via TaskGroup). Making per-video frame processing concurrent would cut time to ~1-2s per video but requires memory bounding.
-- Export annotation overlay is temporarily disabled (incompatible with custom AVVideoCompositing). Annotations will be integrated into PanelCompositor.
-- No periodic drift re-sync between players during playback. If players drift >0.03s, user must pause/play to re-sync.
+| Mechanism | What it does | Source |
+|---|---|---|
+| Pure planning before encoding | `ExportPlan` computes inserts, timeline edits, panels, audio source, FPS, and disk estimate without running an export session. | `Coreo/Export/ExportPlan.swift:11`, `Coreo/Export/ExportPlan.swift:97` |
+| Disk preflight | Estimated output bytes are checked against temp volume capacity before composition export starts. | `Coreo/Export/ExportPlan.swift:218`, `Coreo/Export/ExportEngine.swift:92`, `Coreo/Export/ExportEngine.swift:607` |
+| Custom CI compositor | `PanelCompositor` serializes render requests on a user-initiated queue, clips each panel, and uses a hardware CIContext. | `Coreo/Export/PanelCompositor.swift:110`, `Coreo/Export/PanelCompositor.swift:112`, `Coreo/Export/PanelCompositor.swift:131` |
+| Off-main orchestration | Export work is launched in a `Task`, and progress is posted back through the coordinator. | `Coreo/Workspace/ExportCoordinator.swift:74`, `Coreo/Export/ExportEngine.swift:163` |
+| Export cancellation | Task cancellation cancels the underlying export session and removes partial output on cancelled/failed paths. | `Coreo/Export/ExportEngine.swift:571`, `Coreo/Export/ExportEngine.swift:587` |
+| Bumper cache | End bumper generation is cached by resolution and FPS while the temp file still exists. | `Coreo/Export/EndBumperGenerator.swift:64`, `Coreo/Export/EndBumperGenerator.swift:357` |
+| Background task | Export starts a UIKit background task and cancels if the background task expires. | `Coreo/Export/ExportEngine.swift:455`, `Coreo/Export/ExportEngine.swift:481` |
 
----
+## Persistence
 
-## Recommended Test Scenarios
+| Mechanism | What it does | Source |
+|---|---|---|
+| Debounced autosave | Project mutation schedules a 2 second delayed save and cancels older pending saves. | `Coreo/Workspace/WorkspaceViewModel.swift:17`, `Coreo/Workspace/WorkspaceViewModel.swift:748` |
+| Immediate save on lifecycle | Background and teardown paths cancel pending debounce and write immediately. | `Coreo/Workspace/WorkspaceViewModel.swift:675`, `Coreo/Workspace/WorkspaceViewModel.swift:592`, `Coreo/Workspace/WorkspaceViewModel.swift:765` |
+| Atomic project JSON | Saves write to a temp file and replace or move into `project.json`. | `Coreo/Models/ProjectStore.swift:203`, `Coreo/Models/ProjectStore.swift:221` |
+| Protected copied media | Imported media is copied into the project directory and excluded from backup. | `Coreo/Models/ProjectStore.swift:170`, `Coreo/Models/ProjectStore.swift:177` |
 
-### Memory Pressure
-1. Import 6 landscape 1080p videos, enter workspace, monitor memory in Instruments
-2. Play all 6 simultaneously for 2 minutes, verify no jetsam
-3. Export while playing music in background, verify export completes
+## Not Yet Measured
 
-### Background/Foreground
-1. Start playback, background the app, return — verify playback resumes
-2. Start export, background the app — verify export completes (within 30s background time)
-3. Background during sync — verify sync doesn't continue wasting CPU
+| Gap | Current evidence |
+|---|---|
+| No on-device Instruments profile is recorded in repo. | No Instruments trace or profiling report exists in current files. |
+| Verification so far is simulator/build/test based, not device thermal or memory pressure based. | Required gate is `xcodebuild test -scheme Coreo -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.5'`. |
+| No sourced peak memory, FPS, or export-time numbers are available here. | The source defines caps such as 75s correlation windows, 2 concurrent correlations, 4000 waveform buckets, and 5s player buffers, but not measured outcomes. |
 
-### Edge Cases
-1. Import a video with no audio track — sync should error gracefully
-2. Export with speed segment at 0.25x — verify correct duration
-3. Navigate back from workspace rapidly — verify no zombie observers
-4. Delete source video from Photos after import — verify graceful failure
+## Known Performance Limits
+
+| Limit | Evidence |
+|---|---|
+| Audio extraction still accumulates full PCM arrays before sync/windowing and waveform downsampling. | `Coreo/Sync/AudioExtractor.swift:93`, `Coreo/Sync/AudioSyncEngine.swift:178`, `Coreo/Sync/WaveformEnvelope.swift:49` |
+| `FFTHelper.crossCorrelate` still allocates and returns the full correlation array, although callers only need the lag and confidence. | `Coreo/Utilities/FFTHelper.swift:46`, `Coreo/Utilities/FFTHelper.swift:231` |
+| Per-video Vision frame processing is sequential inside each video task. | `Coreo/Crop/PersonDetector.swift:82` |
+| Some compact controls intentionally use plain button style or 28x24 visual frames, though surrounding accessibility coverage varies by control. | `Coreo/Workspace/VideoPanelView.swift:144`, `Coreo/Workspace/VideoPanelView.swift:214` |
